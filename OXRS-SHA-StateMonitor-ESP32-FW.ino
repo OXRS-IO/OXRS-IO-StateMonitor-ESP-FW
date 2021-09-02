@@ -9,9 +9,9 @@
   External dependencies. Install using the Arduino library manager:
     "Adafruit_MCP23X17" (requires recent "Adafruit_BusIO" library)
     "PubSubClient" by Nick O'Leary
-    "SSD1306Ascii"
     "OXRS-SHA-MQTT-ESP32-LIB" by SuperHouse Automation Pty
     "OXRS-SHA-IOHandler-ESP32-LIB" by SuperHouse Automation Pty
+    "SSD1306Ascii"
 
   Bundled dependencies. No need to install separately:
     "USM_Oled" by moinmoin-sh
@@ -32,6 +32,7 @@
 
 /*--------------------------- Version ------------------------------------*/
 #define FW_NAME    "OXRS-SHA-StateMonitor-ESP32-FW"
+#define FW_CODE    "osm"
 #define FW_VERSION "1.0.0"
 
 /*--------------------------- Configuration ------------------------------*/
@@ -61,9 +62,6 @@ uint8_t g_mcps_found = 0;
 
 // Was an OLED found on the I2C bus
 byte g_oled_found = 0;
-
-// Last time the watchdog was reset
-uint32_t g_watchdog_last_reset_ms = 0L;
 
 // store MCP portAB values -> needed for port animation
 uint16_t g_mcp_io_values[MCP_COUNT];
@@ -110,17 +108,13 @@ void setup()
   Serial.println(FW_VERSION);
   Serial.println(F("==============================="));
 
-  // Set up watchdog
-  initialiseWatchdog();
-
   // Start the I2C bus
   Wire.begin();
 
-  // Scan the I2C bus for any MCP23017s and initialise them
+  // Scan the I2C bus and set up I/O buffers
   scanI2CBus();
 
-  // Set I2C clock to 400 kHz for faster scan rate  
-  // needs to be called after scanI2CBus() to take effect
+  // Speed up I2C clock for faster scan rate (after bus scan)
   Wire.setClock(I2C_CLOCK_SPEED);
 
   // Display the firmware version and initialise the port display
@@ -130,47 +124,12 @@ void setup()
     USM_Oled_draw_ports(g_mcps_found);
   }
 
-  // Determine Ethernet MAC address
-  byte ethernet_mac[6];
-  if (ENABLE_MAC_ADDRESS_ROM)
-  {
-#ifdef ARDUINO_ARCH_ESP32
-    Serial.print(F("Getting Ethernet MAC address from ESP32 Base MAC: "));
-    WiFi.macAddress(ethernet_mac);  // Temporarily populate Ethernet MAC with ESP32 Base MAC
-    ethernet_mac[5] += 3;           // Ethernet MAC is Base MAC + 3 (see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/system.html#mac-address)
-#else
-    Serial.print(F("Getting Ethernet MAC address from external ROM: "));
-    ethernet_mac[0] = readRegister(MAC_I2C_ADDRESS, 0xFA);
-    ethernet_mac[1] = readRegister(MAC_I2C_ADDRESS, 0xFB);
-    ethernet_mac[2] = readRegister(MAC_I2C_ADDRESS, 0xFC);
-    ethernet_mac[3] = readRegister(MAC_I2C_ADDRESS, 0xFD);
-    ethernet_mac[4] = readRegister(MAC_I2C_ADDRESS, 0xFE);
-    ethernet_mac[5] = readRegister(MAC_I2C_ADDRESS, 0xFF);
-#endif
-  }
-  else
-  {
-    Serial.print(F("Using static MAC address: "));
-    memcpy(ethernet_mac, STATIC_MAC, sizeof(ethernet_mac));
-  }
-  char mac_address[18];
-  sprintf_P(mac_address, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), ethernet_mac[0], ethernet_mac[1], ethernet_mac[2], ethernet_mac[3], ethernet_mac[4], ethernet_mac[5]);
-  Serial.println(mac_address);
+  // Set up ethernet and obtain an IP address
+  byte mac[6];
+  initialiseEthernet(mac);
 
-  // Set up Ethernet
-  Ethernet.init(ETHERNET_CS_PIN);
-  resetWiznetChip();
-  if (ENABLE_DHCP)
-  {
-    Serial.print(F("Getting IP address via DHCP: "));
-    Ethernet.begin(ethernet_mac);
-  }
-  else
-  {
-    Serial.print(F("Using static IP address: "));
-    Ethernet.begin(ethernet_mac, STATIC_IP, STATIC_DNS);
-  }
-  Serial.println(Ethernet.localIP());
+  // Set up connection to MQTT broker
+  initialiseMqtt(mac);
 
   // Display IP and MAC addresses
   if (g_oled_found)
@@ -178,17 +137,11 @@ void setup()
     oled.setCursor(25, 2);
     oled.print(Ethernet.localIP()); 
     oled.setCursor(25, 3);
+    
+    char mac_address[18];
+    sprintf_P(mac_address, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     oled.print(mac_address); 
   }
-
-  // Set up our MQTT connection
-  mqtt.setClientId("osm", ethernet_mac);
-  mqtt.setAuth(MQTT_USERNAME, MQTT_PASSWORD);
-  mqtt.setTopicPrefix(MQTT_TOPIC_PREFIX);
-  mqtt.setTopicSuffix(MQTT_TOPIC_SUFFIX);
-
-  // Listen for config messages
-  mqtt.onConfig(mqttConfig);
 }
 
 /**
@@ -231,14 +184,30 @@ void loop()
   
   // Update OLED port animation 
   updateOled(port_changed);
-
-  // Pat the watchdog once our processing loop completes
-  patWatchdog();
 }
 
 /**
   MQTT
 */
+void initialiseMqtt(byte * mac)
+{
+  // Set the MQTT client id to the f/w code + MAC address
+  mqtt.setClientId(FW_CODE, mac);
+
+#ifdef MQTT_USERNAME
+  mqtt.setAuth(MQTT_USERNAME, MQTT_PASSWORD);
+#endif
+#ifdef MQTT_TOPIC_PREFIX
+  mqtt.setTopicPrefix(MQTT_TOPIC_PREFIX);
+#endif
+#ifdef MQTT_TOPIC_SUFFIX
+  mqtt.setTopicSuffix(MQTT_TOPIC_SUFFIX);
+#endif
+  
+  // Listen for config messages
+  mqtt.onConfig(mqttConfig);
+}
+
 void mqttCallback(char * topic, byte * payload, int length) 
 {
   // Pass this message down to our MQTT handler
@@ -514,40 +483,6 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 }
 
 /**
-  Watchdog
-*/
-void initialiseWatchdog()
-{
-  if (ENABLE_WATCHDOG)
-  {
-    Serial.print(F("Watchdog enabled on pin "));
-    Serial.println(WATCHDOG_PIN);
-
-    pinMode(WATCHDOG_PIN, OUTPUT);
-    digitalWrite(WATCHDOG_PIN, LOW);
-  }
-  else
-  {
-    Serial.println(F("Watchdog NOT enabled"));
-  }
-}
-
-void patWatchdog()
-{
-  if (ENABLE_WATCHDOG)
-  {
-    if ((millis() - g_watchdog_last_reset_ms) > WATCHDOG_RESET_MS)
-    {
-      digitalWrite(WATCHDOG_PIN, HIGH);
-      delay(WATCHDOG_PULSE_MS);
-      digitalWrite(WATCHDOG_PIN, LOW);
-
-      g_watchdog_last_reset_ms = millis();
-    }
-  }
-}
-
-/**
   I2C
 */
 void scanI2CBus()
@@ -629,22 +564,42 @@ void scanI2CBus()
   }
 }
 
-// Read 1 byte from I2C device register
-uint8_t readRegister(int adr, uint8_t reg) 
+/**
+  Ethernet
+ */
+void initialiseEthernet(byte * ethernet_mac)
 {
-  Wire.beginTransmission(adr);
-  Wire.write(reg);
-  Wire.endTransmission();
-  Wire.requestFrom(adr, 1);
-  while (!Wire.available()) {}
-  return Wire.read();
-}
+  // Determine MAC address
+#ifdef STATIC_MAC
+  Serial.print(F("Using static MAC address: "));
+  memcpy(ethernet_mac, STATIC_MAC, sizeof(ethernet_mac));
+#elif ARDUINO_ARCH_ESP32
+  Serial.print(F("Getting Ethernet MAC address from ESP32: "));
+  WiFi.macAddress(ethernet_mac);  // Temporarily populate Ethernet MAC with ESP32 Base MAC
+  ethernet_mac[5] += 3;           // Ethernet MAC is Base MAC + 3 (see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/system.html#mac-address)
+#else
+  Serial.print(F("Using hardcoded MAC address: "));
+  ethernet_mac[0] = 0xDE;
+  ethernet_mac[1] = 0xAD;
+  ethernet_mac[2] = 0xBE;
+  ethernet_mac[3] = 0xEF;
+  ethernet_mac[4] = 0xFE;
+  ethernet_mac[5] = 0xED;
+#endif
 
-// Reset the Wiznet Ethernet chip
-void resetWiznetChip()
-{
+  // Display MAC address on serial
+  char mac_address[18];
+  sprintf_P(mac_address, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), ethernet_mac[0], ethernet_mac[1], ethernet_mac[2], ethernet_mac[3], ethernet_mac[4], ethernet_mac[5]);
+  Serial.println(mac_address);
+
+  // Set up Ethernet
+#ifdef ETHERNET_CS_PIN
+  Ethernet.init(ETHERNET_CS_PIN);
+#endif
+
+  // Reset the Wiznet Ethernet chip
 #ifdef WIZNET_RESET_PIN
-  Serial.print("Resetting Wiznet W5500 Ethernet chip...  ");
+  Serial.print("Resetting Wiznet W5500 Ethernet chip...");
   pinMode(WIZNET_RESET_PIN, OUTPUT);
   digitalWrite(WIZNET_RESET_PIN, HIGH);
   delay(250);
@@ -652,6 +607,18 @@ void resetWiznetChip()
   delay(50);
   digitalWrite(WIZNET_RESET_PIN, HIGH);
   delay(350);
-  Serial.println("Done.");
+  Serial.println("done");
 #endif
+
+  // Obtain IP address
+#ifdef STATIC_IP
+  Serial.print(F("Using static IP address: "));
+  Ethernet.begin(ethernet_mac, STATIC_IP, STATIC_DNS);
+#else
+  Serial.print(F("Getting IP address via DHCP: "));
+  Ethernet.begin(ethernet_mac);
+#endif
+
+  // Display IP address on serial
+  Serial.println(Ethernet.localIP());
 }
