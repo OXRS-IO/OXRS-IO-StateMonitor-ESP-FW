@@ -1,0 +1,57 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+/* ----------------- General config -------------------------------- */
+/* Serial */
+#define       SERIAL_BAUD_RATE        115200
+
+/* Ethernet */
+#define       ENABLE_DHCP             true
+#define       ENABLE_MAC_ADDRESS_ROM  true
+#define       MAC_I2C_ADDRESS         0x50                  // Microchip 24AA125E48 I2C ROM address
+
+const byte    STATIC_MAC[]          = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; // Use if no MAC ROM
+const byte    STATIC_IP[]           = { 192, 168, 1, 35 };                    // Use if DHCP disabled
+const byte    STATIC_DNS[]          = { 192, 168, 1, 1 };                     // Use if DHCP disabled
+
+/* MQTT */
+const char *  MQTT_BROKER           = "test.mosquitto.org"; // IP address or host name of your MQTT broker
+const int     MQTT_PORT             = 1883;
+const char *  MQTT_USERNAME         = NULL;                 // Optional, NULL if no authentication
+const char *  MQTT_PASSWORD         = NULL;                 // Optional, NULL if no authentication
+const char *  MQTT_BASE_TOPIC       = NULL;                 // Optional, NULL if no prefix in topic path
+const char *  MQTT_LOCATION         = NULL;                 // Optional, NULL if no location in topic path
+
+/* ----------------- Hardware-specific config ---------------------- */
+/* I2C */
+#define       I2C_CLOCK_SPEED         400000L  
+             
+/* Ethernet */
+// Uncomment only ONE "CS" option to suit your hardware:
+#define       ETHERNET_CS_PIN         26                    // Rack32 (ESP32) with W5500
+//#define       ETHERNET_CS_PIN         10                    // EtherMega (ATmega2560) with W5100
+// Comment out the line below if your hardware doesn't have a Wiznet reset pin:
+#define       WIZNET_RESET_PIN        13                    // Rack32 (ESP32) with W5500
+
+/* MCP23017 */
+const byte    MCP_I2C_ADDRESS[]     = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27 };
+const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
+#define       MCP_INTERNAL_PULLUPS    false                 // Enable if using an old LSC breakout with no external pullups
+
+/* Watchdog */
+#define       ENABLE_WATCHDOG         false
+#define       WATCHDOG_PIN            3                     // Output to pat the watchdog
+#define       WATCHDOG_PULSE_MS       50
+#define       WATCHDOG_RESET_MS       30000
+
+/* OLED - ONE and ONLY ONE OLED_TYPE should be defined (comment out an others) */
+//#define       OLED_TYPE_SSD1306                           // Mostly the .96"
+#define       OLED_TYPE_SH1106                              // Mostly the 1.3"
+#define       OLED_I2C_ADDRESS        0x3c                  // I2c address of OLED used
+#define       OLED_RESET_PIN          -1                    // Reset pin (or -1 if sharing Arduino reset pin)
+#define       OLED_CONTRAST_ON        128                   // OLED contrast when ON, i.e. after an event
+#define       OLED_CONTRAST_DIM       0                     // OLED contrast when DIMMED (0 == OFF), i.e. after OLED_ON_MS expires
+#define       OLED_ON_MS              10000                 // How long to turn on the OLED after an event
+#define       OLED_EVENT_MS           3000                  // How long to display an event in the bottom line
+
+#endif
