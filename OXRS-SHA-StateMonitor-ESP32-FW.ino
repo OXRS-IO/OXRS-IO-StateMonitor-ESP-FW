@@ -11,10 +11,7 @@
     "PubSubClient" by Nick O'Leary
     "OXRS-SHA-MQTT-ESP32-LIB" by SuperHouse Automation Pty
     "OXRS-SHA-IOHandler-ESP32-LIB" by SuperHouse Automation Pty
-    "SSD1306Ascii"
-
-  Bundled dependencies. No need to install separately:
-    "USM_Oled" by moinmoin-sh
+    "OXRS-SHA-LCD-ESP32-LIB" by SuperHouse Automation Pty
 
   Based on the Light Switch Controller hardware found here:
     www.superhouse.tv/lightswitch
@@ -46,7 +43,6 @@
 #include <OXRS_MQTT.h>                // For MQTT
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
 #include <OXRS_Input.h>               // For input handling
-#include <OXRS_OLED.h>                // For OLED runtime displays
 #include <OXRS_LCD.h>                 // For LCD runtime displays
 
 #ifdef ARDUINO_ARCH_ESP32
@@ -60,9 +56,6 @@
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
-
-// store MCP portAB values -> needed for port animation
-uint16_t g_mcp_io_values[MCP_COUNT];
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -81,9 +74,8 @@ EthernetClient ethernet;
 PubSubClient mqttClient(MQTT_BROKER, MQTT_PORT, mqttCallback, ethernet);
 OXRS_MQTT mqtt(mqttClient);
 
-// screen functions (uncomment only one)
-OXRS_OLED screen;   // if I2C OLED is used
-//OXRS_LCD screen;    // if SPI LCD is used 
+// screen functions
+OXRS_LCD screen;
 
 /*--------------------------- Program ------------------------------------*/
 /**
@@ -110,7 +102,7 @@ void setup()
   // initialize screen
   screen.begin();
   
-  // Speed up I2C clock for faster scan rate (after bus scan and OLED init)
+  // Speed up I2C clock for faster scan rate (after bus scan and screen init)
   Wire.setClock(I2C_CLOCK_SPEED);
 
   // Display the firmware version and initialise the port display
