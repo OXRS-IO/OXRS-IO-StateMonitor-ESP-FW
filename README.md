@@ -6,9 +6,9 @@ This system uses UTP cable (typically Cat-5e because it's cheap) to connect bina
 
 It also supports rotary encoders (using 2 data lines) to allow up/down control for media player volume, light dimming, etc.
 
-When a sensor state change is detected the USM will publish an MQTT message to the configured MQTT broker for further processing by your home automation system.
+When an input state change is detected an MQTT message is published to the configured MQTT broker for further processing by your home automation system.
 
-Each port on a USM can monitor up to 4 channels and are numbered (for a 24-port USM);
+Each port can monitor up to 4 channels and are numbered;
 
 |INDEX|PORT|CHANNEL|TYPE |RJ45 Pin|
 |-----|----|-------|-----|--------|
@@ -21,64 +21,83 @@ Each port on a USM can monitor up to 4 channels and are numbered (for a 24-port 
 |7    |2   |3      |Input|3       |
 |8    |2   |4      |Input|6       |
 |...  |    |       |     |        |
-|93   |24  |1      |Input|1       |
-|94   |24  |2      |Input|2       |
-|95   |24  |3      |Input|3       |
-|96   |24  |4      |Input|6       |
 
+The firmware is designed to run on hardware using MCP23017 I/O buffer chips via I2C, e.g. the [Light Switch Controller](https://github.com/SuperHouse/LSC). A single I2C bus can only support up to a maximum of 8x MCP23017 chips (addresses `0x20-0x27`). Therefore the maximum number of supported inputs is 128 (i.e. 8x MCP23017s * 16x I/O pins), or 32 ports.
 
 ## Inputs
 ### Configuration
-Each INPUT can be configured by publishing an MQTT message to one of these topics;
+Each INPUT can be configured by publishing an MQTT message to this topic;
 ```
-[BASETOPIC/]conf/CLIENTID/[LOCATION/]INDEX/type
-[BASETOPIC/]conf/CLIENTID/[LOCATION/]INDEX/invt
+[PREFIX/]conf/CLIENTID[/SUFFIX]
 ```    
 where;
-- `BASETOPIC`:   Optional base topic if your topic structure requires it
-- `CLIENTID`:    Client id of device, defaults to `usm-<MACADDRESS>`
-- `LOCATION`:    Optional location if your topic structure requires it
-- `INDEX`:       Index of the input to configure (1-based)
+- `PREFIX`:   Optional topic prefix if required
+- `CLIENTID`: Client id of device, defaults to `osm-<MACADDRESS>`
+- `SUFFIX`:   Optional topic suffix if required
     
-The message should be;
-- `/type`:       One of `button`, `contact`, `rotary`, `switch` or `toggle`
-- `/invt`:       Either `off` or `on` (to invert event)
+The message payload should be JSON and contain;
+- `index`:    Mandatory, the index of the input to configure
+- `type`:     Optional, either `button`, `contact`, `rotary`, `switch` or `toggle`
+- `invert`:   Optional, either `on` or `off`
     
-A null or empty message will reset the input to;
-- `/type`:       `switch`
-- `/invt`:       `off` (non-inverted)
-    
-A retained message will ensure the USM auto-configures on startup.
+A null or empty value will reset the configuration to;
+- `type`:     `switch`
+- `invert`:   `off` (non-inverted)
+
+#### Examples
+To configure input 4 to be a contact sensor;
+``` js
+{ "input": 4, "type": "contact" }
+```
+
+To configure input 7 to be an inverted button;
+``` js
+{ "input": 7, "type": "button", "invert": "on" }
+```
+
+A retained message will ensure the device auto-configures on startup.
 
 **NOTE: inverting a normally-open (NO) button input will result in a constant stream of `hold` events!**
 
 ### Events
 An input EVENT is reported to a topic of the form;
 ```
-[BASETOPIC/]stat/CLIENTID/[LOCATION/]INDEX
+[PREFIX/]stat/CLIENTID[/SUFFIX]
 ```
 where; 
-- `BASETOPIC`:   Optional base topic if your topic structure requires it
-- `CLIENTID`:    Client id of device, defaults to `usm-<MACADDRESS>`
-- `LOCATION`:    Optional location if your topic structure requires it
-- `INDEX`:       Index of the input to configure (1-based)
+- `PREFIX`:   Optional topic prefix if required
+- `CLIENTID`: Client id of device, defaults to `osm-<MACADDRESS>`
+- `SUFFIX`:   Optional topic suffix if required
 
-The message is a JSON payload of the form; 
-```
-{"port":2,"channel":3,"index":7,"type":"contact","event":"open"}
-```
-where `event` can be one of (depending on type);
-- `button`:      `single`, `double`, `triple`, `quad`, `penta`, or `hold`
-- `contact`:     `open` or `closed`
-- `rotary`:      `up` or `down`
-- `switch`:      `on` or `off`
-- `toggle`:      `toggle`
+The message payload is JSON and contains; 
+- `port`:     The port this event occured on (1-32)
+- `channel`:  The channel this event occured on (1-4)
+- `index`:    The index of this event (1-128)
+- `type`:     Either `button`, `contact`, `rotary`, `switch` or `toggle`
+- `event`:    The type of event (see below)
 
+Where `event` can be one of (depending on type);
+- `button`:   `single`, `double`, `triple`, `quad`, `penta`, or `hold`
+- `contact`:  `open` or `closed`
+- `rotary`:   `up` or `down`
+- `switch`:   `on` or `off`
+- `toggle`:   `toggle`
+
+#### Examples
+A contact opening on input 7;
+``` js
+{ "port": 2, "channel": 3, "index": 7, "type": "contact", "event": "open" }
+```
+
+A triple button click on input 4;
+``` js
+{ "port": 1, "channel": 4, "index": 4, "type": "button", "event": "triple" }
+```
 
 ## Hardware
-The USM firmware is compatible with the [Light Switch Controller](https://github.com/SuperHouse/LSC) (LSC) and is designed to run on the [Universal Rack Controller](https://github.com/SuperHouse/URC) (URC).
+This firmware is compatible with the [Light Switch Controller](https://github.com/SuperHouse/LSC) (LSC) and is designed to run on the [RACK32](https://github.com/SuperHouse/RACK32) as part of the [OXRS](https://oxrs.io) eco-system.
 
-The LSC hardware provides 12V power down the line, which can be used for powering sensors (e.g. PIRs), or illuminating LEDs.
+The LSC hardware provides 12V power down the cable, which can be used for powering sensors (e.g. PIRs), or illuminating LEDs.
 
 The sensors or switches should pull one of 4 INPUT wires in the cable to GND to indicate that they have been activated. 
 
