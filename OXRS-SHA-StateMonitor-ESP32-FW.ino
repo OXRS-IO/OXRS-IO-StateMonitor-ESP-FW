@@ -106,19 +106,23 @@ void setup()
   Wire.setClock(I2C_CLOCK_SPEED);
 
   // Display the firmware version and initialise the port display
-  screen.draw_logo(FW_VERSION);
+  screen.draw_logo(FW_NAME, FW_VERSION);
   screen.draw_ports(g_mcps_found);
 
   // Set up ethernet and obtain an IP address
   byte mac[6];
   initialiseEthernet(mac);
+  
+  // Display IP and MAC addresses on screen
+  screen.show_IP(Ethernet.localIP());
+  screen.show_MAC(mac);
 
   // Set up connection to MQTT broker
   initialiseMqtt(mac);
 
-  // Display IP and MAC addresses on screen
-  screen.show_IP(Ethernet.localIP());
-  screen.show_MAC(mac);
+  // Display MQTT topic and RACK temperature on screen
+  screen.show_MQTT_topic("MQTT-topic TBD ????");     // need to find out how to get topic
+  screen.show_rack_temp(12.3456);               // for test now. value will be replaced by measured tempereture
 }
 
 /**
