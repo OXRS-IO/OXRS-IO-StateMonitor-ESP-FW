@@ -9,21 +9,19 @@
   External dependencies. Install using the Arduino library manager:
     "Adafruit_MCP23X17" (requires recent "Adafruit_BusIO" library)
     "PubSubClient" by Nick O'Leary
-    "OXRS-SHA-MQTT-ESP32-LIB" by SuperHouse Automation Pty
+    "OXRS-IO-MQTT-ESP32-LIB" by OXRS Core Team
+    "OXRS-IO-LCD-ESP32-LIB" by OXRS Core Team
     "OXRS-SHA-IOHandler-ESP32-LIB" by SuperHouse Automation Pty
-    "OXRS-SHA-LCD-ESP32-LIB" by SuperHouse Automation Pty
 
-  Based on the Light Switch Controller hardware found here:
+  Compatible with the Light Switch Controller hardware found here:
     www.superhouse.tv/lightswitch
 
+  GitHub repository:
+    https://github.com/SuperHouse/OXRS-SHA-StateMonitor-ESP32-FW
+
   Bugs/Features:
-   - See GitHub issues list.
-
-  Written by Ben Jones & Moin on behalf of www.superhouse.tv
-    https://github.com/sumnerboy12/
-    https://github.com/moinmoin-sh/
-    https://github.com/superhouse/
-
+    See GitHub issues list
+  
   Copyright 2019-2021 SuperHouse Automation Pty Ltd
 */
 
