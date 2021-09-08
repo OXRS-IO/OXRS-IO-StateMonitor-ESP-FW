@@ -28,9 +28,12 @@
 */
 
 /*--------------------------- Version ------------------------------------*/
-#define FW_NAME    "OXRS-SHA-StateMonitor-ESP32-FW"
-#define FW_CODE    "osm"
-#define FW_VERSION "1.0.0"
+#define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
+#define FW_CODE       "osm"
+#define FW_VERSION    "1.0.0"
+#define FW_SHORT_NAME "State Monitor"
+#define FW_MAKER_CODE "SHA"
+#define FW_PLATFORM   "ESP32"
 
 /*--------------------------- Configuration ------------------------------*/
 // Should be no user configuration in this file, everything should be in;
@@ -56,6 +59,8 @@
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
+
+uint8_t g_ethernet_link_status = 0;
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -105,8 +110,8 @@ void setup()
   // Speed up I2C clock for faster scan rate (after bus scan and screen init)
   Wire.setClock(I2C_CLOCK_SPEED);
 
-  // Display the firmware version and initialise the port display
-  screen.draw_logo(FW_NAME, FW_VERSION);
+  // Display the header and initialise the port display
+  screen.draw_header(FW_MAKER_CODE, FW_SHORT_NAME, FW_VERSION, FW_PLATFORM);
   screen.draw_ports(g_mcps_found);
 
   // Set up ethernet and obtain an IP address
@@ -114,14 +119,16 @@ void setup()
   initialiseEthernet(mac);
   
   // Display IP and MAC addresses on screen
-  screen.show_IP(Ethernet.localIP());
+  screen.show_IP(Ethernet.localIP(), Ethernet.linkStatus() == LinkON);
   screen.show_MAC(mac);
 
   // Set up connection to MQTT broker
   initialiseMqtt(mac);
 
   // Display MQTT topic and RACK temperature on screen
-  screen.show_MQTT_topic("MQTT-topic TBD ????");     // need to find out how to get topic
+  char topic [64];
+  mqtt.getStatusTopic(topic);
+  screen.show_MQTT_topic(topic);
   screen.show_rack_temp(12.3456);               // for test now. value will be replaced by measured tempereture
 }
 
@@ -132,6 +139,19 @@ void loop()
 {
   // Check our DHCP lease is still ok
   Ethernet.maintain();
+  uint8_t tmp = Ethernet.linkStatus();
+  if (tmp != g_ethernet_link_status)
+  {
+    if (tmp != LinkON)
+    {
+      screen.show_IP(IPAddress(0,0,0,0), 0);
+    }
+    else
+    {
+      screen.show_IP(Ethernet.localIP(), 1);
+    }
+    g_ethernet_link_status = tmp;
+  }
 
   // Check our MQTT broker connection is still ok
   mqtt.loop();
@@ -179,6 +199,7 @@ void initialiseMqtt(byte * mac)
 
 void mqttCallback(char * topic, byte * payload, int length) 
 {
+  screen.trigger_mqtt_rx_led ();
   // Pass this message down to our MQTT handler
   mqtt.receive(topic, payload, length);
 }
@@ -282,6 +303,7 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   json["event"] = eventType;
 
   // Publish to MQTT
+  screen.trigger_mqtt_tx_led ();
   if (!mqtt.publishStatus(json.as<JsonObject>()))
   {
     Serial.println("FAILOVER!!!");    
