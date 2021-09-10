@@ -5,16 +5,20 @@
   
   Compile options:
     ESP32
+
   External dependencies. Install using the Arduino library manager:
     "Adafruit_MCP23X17" (requires recent "Adafruit_BusIO" library)
     "PubSubClient" by Nick O'Leary
     "OXRS-IO-MQTT-ESP32-LIB" by OXRS Core Team
     "OXRS-IO-LCD-ESP32-LIB" by OXRS Core Team
     "OXRS-SHA-IOHandler-ESP32-LIB" by SuperHouse Automation Pty
+
   Compatible with the Light Switch Controller hardware found here:
     www.superhouse.tv/lightswitch
+
   GitHub repository:
     https://github.com/SuperHouse/OXRS-SHA-StateMonitor-ESP32-FW
+
   Bugs/Features:
     See GitHub issues list
   
@@ -52,7 +56,10 @@
 
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
-uint8_t g_mcps_found = 0;
+uint8_t   g_mcps_found = 0;
+
+// temperature update interval timer
+uint32_t  g_last_temp_update = -TEMP_UPDATE_INTERVAL;
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -68,7 +75,7 @@ OXRS_Input oxrsInput[MCP_COUNT];
 EthernetClient ethernet;
 
 // screen functions
-OXRS_LCD screen;
+OXRS_LCD screen(&Ethernet);
 
 // MQTT client
 PubSubClient mqttClient(MQTT_BROKER, MQTT_PORT, mqttCallback, ethernet);
@@ -110,14 +117,8 @@ void setup()
   byte mac[6];
   initialiseEthernet(mac);
   
-  // Display IP and MAC addresses on screen
-  screen.show_ethernet();
-
   // Set up connection to MQTT broker
   initialiseMqtt(mac);
-
-  // Display temperature on screen
-  screen.show_temp(12.3456);               // for test now. value will be replaced by measured tempereture
 }
 
 /**
@@ -145,10 +146,34 @@ void loop()
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
   }
+
+  // check for temperature udate
+  update_temperature ();
   
   // maintain screen
   screen.loop();
 }
+
+/**
+  check if temperature udate required
+  read temperature from on board sensor
+  update screen
+  publish mqtt tele/....  {"temp": xx.xx}
+*/
+void update_temperature ()
+{
+  if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL)
+  {
+    // read temp from sensor
+    // TODO
+    // Display temperature on screen
+    screen.show_temp(random(0, 10000) / 100.0);               // for test now. value will be replaced by measured value
+    // publish to mqtt
+    // TODO
+    g_last_temp_update = millis();
+  }
+}
+
 
 /**
   MQTT
@@ -483,7 +508,7 @@ void initialiseEthernet(byte * ethernet_mac)
   Ethernet.begin(ethernet_mac, STATIC_IP, STATIC_DNS);
 #else
   Serial.print(F("Getting IP address via DHCP: "));
-  Ethernet.begin(ethernet_mac);
+  Ethernet.begin(ethernet_mac, 10000);
 #endif
 
   // Display IP address on serial
