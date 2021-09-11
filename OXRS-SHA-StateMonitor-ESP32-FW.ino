@@ -30,7 +30,7 @@
 #define FW_CODE       "osm"
 #define FW_VERSION    "1.0.0"
 #define FW_SHORT_NAME "State Monitor"
-#define FW_MAKER_CODE "SHA"
+#define FW_MAKER_CODE "IO"
 #define FW_PLATFORM   "ESP32"
 
 /*--------------------------- Configuration ------------------------------*/
@@ -75,11 +75,11 @@ OXRS_Input oxrsInput[MCP_COUNT];
 EthernetClient ethernet;
 
 // screen functions
-OXRS_LCD screen(&Ethernet);
+OXRS_LCD screen(Ethernet);
 
 // MQTT client
 PubSubClient mqttClient(MQTT_BROKER, MQTT_PORT, mqttCallback, ethernet);
-OXRS_MQTT mqtt(mqttClient, &screen);
+OXRS_MQTT mqtt(mqttClient, screen);
 
 /*--------------------------- Program ------------------------------------*/
 /**
