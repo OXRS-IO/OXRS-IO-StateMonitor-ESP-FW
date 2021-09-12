@@ -111,7 +111,7 @@ void setup()
 
   // Display the header and initialise the port display
   screen.draw_header(FW_MAKER_CODE, FW_SHORT_NAME, FW_VERSION, FW_PLATFORM);
-  screen.draw_ports(g_mcps_found);
+  screen.draw_ports(PORT_LAYOUT_INPUT_96, g_mcps_found);
 
   // Set up ethernet and obtain an IP address
   byte mac[6];
