@@ -10,6 +10,8 @@ const char *  MQTT_PASSWORD         = NULL;                 // Optional, NULL if
 const char *  MQTT_TOPIC_PREFIX     = NULL;                 // Optional, NULL if no prefix in topic path
 const char *  MQTT_TOPIC_SUFFIX     = NULL;                 // Optional, NULL if no suffix in topic path
 
+#define       TEMP_UPDATE_INTERVAL    60000L                // How often the temperature sensor is read and published
+
 /* ----------------- Hardware-specific config ---------------------- */
 /* Serial */
 #define       SERIAL_BAUD_RATE        115200

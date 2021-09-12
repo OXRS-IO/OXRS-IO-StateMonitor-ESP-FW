@@ -26,9 +26,12 @@
 */
 
 /*--------------------------- Version ------------------------------------*/
-#define FW_NAME    "OXRS-SHA-StateMonitor-ESP32-FW"
-#define FW_CODE    "osm"
-#define FW_VERSION "1.0.0"
+#define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
+#define FW_CODE       "osm"
+#define FW_VERSION    "1.0.0"
+#define FW_SHORT_NAME "State Monitor"
+#define FW_MAKER_CODE "IO"
+#define FW_PLATFORM   "ESP32"
 
 /*--------------------------- Configuration ------------------------------*/
 // Should be no user configuration in this file, everything should be in;
@@ -53,7 +56,10 @@
 
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
-uint8_t g_mcps_found = 0;
+uint8_t   g_mcps_found = 0;
+
+// temperature update interval timer
+uint32_t  g_last_temp_update = -TEMP_UPDATE_INTERVAL;
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -68,12 +74,12 @@ OXRS_Input oxrsInput[MCP_COUNT];
 // Ethernet client
 EthernetClient ethernet;
 
+// screen functions
+OXRS_LCD screen(Ethernet);
+
 // MQTT client
 PubSubClient mqttClient(MQTT_BROKER, MQTT_PORT, mqttCallback, ethernet);
-OXRS_MQTT mqtt(mqttClient);
-
-// screen functions
-OXRS_LCD screen;
+OXRS_MQTT mqtt(mqttClient, screen);
 
 /*--------------------------- Program ------------------------------------*/
 /**
@@ -100,23 +106,19 @@ void setup()
   // initialize screen
   screen.begin();
   
-  // Speed up I2C clock for faster scan rate (after bus scan and screen init)
+  // Speed up I2C clock for faster scan rate (after bus scan)
   Wire.setClock(I2C_CLOCK_SPEED);
 
-  // Display the firmware version and initialise the port display
-  screen.draw_logo(FW_VERSION);
-  screen.draw_ports(g_mcps_found);
+  // Display the header and initialise the port display
+  screen.draw_header(FW_MAKER_CODE, FW_SHORT_NAME, FW_VERSION, FW_PLATFORM);
+  screen.draw_ports(PORT_LAYOUT_INPUT_96, g_mcps_found);
 
   // Set up ethernet and obtain an IP address
   byte mac[6];
   initialiseEthernet(mac);
-
+  
   // Set up connection to MQTT broker
   initialiseMqtt(mac);
-
-  // Display IP and MAC addresses on screen
-  screen.show_IP(Ethernet.localIP());
-  screen.show_MAC(mac);
 }
 
 /**
@@ -144,10 +146,34 @@ void loop()
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
   }
+
+  // check for temperature udate
+  update_temperature ();
   
-  // Update screen dimming
-  screen.update();
+  // maintain screen
+  screen.loop();
 }
+
+/**
+  check if temperature udate required
+  read temperature from on board sensor
+  update screen
+  publish mqtt tele/....  {"temp": xx.xx}
+*/
+void update_temperature ()
+{
+  if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL)
+  {
+    // read temp from sensor
+    // TODO
+    // Display temperature on screen
+    screen.show_temp(random(0, 10000) / 100.0);               // for test now. value will be replaced by measured value
+    // publish to mqtt
+    // TODO
+    g_last_temp_update = millis();
+  }
+}
+
 
 /**
   MQTT
@@ -482,7 +508,7 @@ void initialiseEthernet(byte * ethernet_mac)
   Ethernet.begin(ethernet_mac, STATIC_IP, STATIC_DNS);
 #else
   Serial.print(F("Getting IP address via DHCP: "));
-  Ethernet.begin(ethernet_mac);
+  Ethernet.begin(ethernet_mac, 10000);
 #endif
 
   // Display IP address on serial
