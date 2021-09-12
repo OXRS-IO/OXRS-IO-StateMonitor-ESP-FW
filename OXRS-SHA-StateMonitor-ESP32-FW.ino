@@ -28,7 +28,7 @@
 /*--------------------------- Version ------------------------------------*/
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_CODE       "osm"
-#define FW_VERSION    "1.0.0"
+#define FW_VERSION    "1.1.0"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER_CODE "IO"
 #define FW_PLATFORM   "ESP32"
