@@ -74,7 +74,7 @@ OXRS_Input oxrsInput[MCP_COUNT];
 // Ethernet client
 EthernetClient ethernet;
 
-// screen functions
+// LCD screen
 OXRS_LCD screen(Ethernet);
 
 // MQTT client
@@ -103,7 +103,7 @@ void setup()
   // Scan the I2C bus and set up I/O buffers
   scanI2CBus();
 
-  // initialize screen
+  // Set up the screen
   screen.begin();
   
   // Speed up I2C clock for faster scan rate (after bus scan)
@@ -111,7 +111,7 @@ void setup()
 
   // Display the header and initialise the port display
   screen.draw_header(FW_MAKER_CODE, FW_SHORT_NAME, FW_VERSION, FW_PLATFORM);
-  screen.draw_ports(PORT_LAYOUT_INPUT_96, g_mcps_found);
+  screen.draw_ports(PORT_LAYOUT_INPUT_128, g_mcps_found);
 
   // Set up ethernet and obtain an IP address
   byte mac[6];
@@ -132,7 +132,7 @@ void loop()
   // Check our MQTT broker connection is still ok
   mqtt.loop();
 
-  // Iterate through each of the MCP23017 input buffers
+  // Iterate through each of the MCP23017s
   uint32_t port_changed = 0L;
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
@@ -141,10 +141,12 @@ void loop()
 
     // Read the values for all 16 inputs on this MCP
     uint16_t io_value = mcp23017[mcp].readGPIOAB();
-    // show port animation
-    screen.process(mcp, io_value);
+    
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
+
+    // Show port animation
+    screen.process(mcp, io_value);
   }
 
   // Check for temperature update
@@ -162,10 +164,10 @@ void updateTemperature()
     float temperature;
     temperature = random(0, 10000) / 100.0;
 
-    // Display temperature on screen
+    // Display temp on screen
     screen.show_temp(temperature); 
 
-    // Publish to mqtt
+    // Publish temp to mqtt
     publishTemperature(temperature);
     
     g_last_temp_update = millis();
@@ -293,9 +295,9 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   getEventType(eventType, type, state);
 
   // Show event on screen
-  char event[32];
-  sprintf_P(event, PSTR("IDX:%2d %s %s   "), index, inputType, eventType);
-  screen.show_event(event);
+  char display[32];
+  sprintf_P(display, PSTR("IDX:%2d %s %s   "), index, inputType, eventType);
+  screen.show_event(display);
 
   // Build JSON payload for this event
   StaticJsonDocument<128> json;
@@ -313,13 +315,14 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   }
   else
   {
+    // TODO: add any failover handling in here!
     Serial.println("FAILOVER!!!");    
   }
 }
 
 void publishTemperature(float temperature)
 {
-  char payload [8];
+  char payload[8];
   sprintf(payload, "%2.2f", temperature);
 
   // Build JSON payload for this event
