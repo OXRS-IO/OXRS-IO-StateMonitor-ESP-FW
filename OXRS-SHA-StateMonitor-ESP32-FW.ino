@@ -56,10 +56,10 @@
 
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
-uint8_t   g_mcps_found = 0;
+uint8_t g_mcps_found = 0;
 
 // temperature update interval timer
-uint32_t  g_last_temp_update = -TEMP_UPDATE_INTERVAL;
+uint32_t g_last_temp_update = -TEMP_UPDATE_INTERVAL;
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -74,12 +74,12 @@ OXRS_Input oxrsInput[MCP_COUNT];
 // Ethernet client
 EthernetClient ethernet;
 
-// screen functions
+// LCD screen
 OXRS_LCD screen(Ethernet);
 
 // MQTT client
 PubSubClient mqttClient(MQTT_BROKER, MQTT_PORT, mqttCallback, ethernet);
-OXRS_MQTT mqtt(mqttClient, screen);
+OXRS_MQTT mqtt(mqttClient);
 
 /*--------------------------- Program ------------------------------------*/
 /**
@@ -103,7 +103,7 @@ void setup()
   // Scan the I2C bus and set up I/O buffers
   scanI2CBus();
 
-  // initialize screen
+  // Set up the screen
   screen.begin();
   
   // Speed up I2C clock for faster scan rate (after bus scan)
@@ -111,7 +111,7 @@ void setup()
 
   // Display the header and initialise the port display
   screen.draw_header(FW_MAKER_CODE, FW_SHORT_NAME, FW_VERSION, FW_PLATFORM);
-  screen.draw_ports(PORT_LAYOUT_INPUT_96, g_mcps_found);
+  screen.draw_ports(PORT_LAYOUT_INPUT_128, g_mcps_found);
 
   // Set up ethernet and obtain an IP address
   byte mac[6];
@@ -132,48 +132,47 @@ void loop()
   // Check our MQTT broker connection is still ok
   mqtt.loop();
 
-  // Iterate through each of the MCP23017 input buffers
+  // Iterate through each of the MCP23017s
   uint32_t port_changed = 0L;
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
     if (bitRead(g_mcps_found, mcp) == 0)
       continue;
 
-    // Read the values for all 16 inputs on this MCP
+    // Read the values for all 16 pins on this MCP
     uint16_t io_value = mcp23017[mcp].readGPIOAB();
-    // show port animation
-    screen.process (mcp, io_value);
+
+    // Show port animation
+    screen.process(mcp, io_value);
+    
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
   }
 
-  // check for temperature udate
-  update_temperature ();
+  // Check for temperature update
+  updateTemperature ();
   
-  // maintain screen
+  // Maintain screen
   screen.loop();
 }
 
-/**
-  check if temperature udate required
-  read temperature from on board sensor
-  update screen
-  publish mqtt tele/....  {"temp": xx.xx}
-*/
-void update_temperature ()
+void updateTemperature()
 {
   if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL)
   {
-    // read temp from sensor
-    // TODO
-    // Display temperature on screen
-    screen.show_temp(random(0, 10000) / 100.0);               // for test now. value will be replaced by measured value
-    // publish to mqtt
-    // TODO
+    // TODO: read temp from onboard sensor
+    float temperature;
+    temperature = random(0, 10000) / 100.0;
+
+    // Display temp on screen
+    screen.show_temp(temperature); 
+
+    // Publish temp to mqtt
+    publishTemperature(temperature);
+    
     g_last_temp_update = millis();
   }
 }
-
 
 /**
   MQTT
@@ -192,6 +191,10 @@ void initialiseMqtt(byte * mac)
 #ifdef MQTT_TOPIC_SUFFIX
   mqtt.setTopicSuffix(MQTT_TOPIC_SUFFIX);
 #endif
+
+  // Display the MQTT topic on screen
+  char topic[64];
+  screen.show_MQTT_topic(mqtt.getWildcardTopic(topic));
   
   // Listen for config messages
   mqtt.onConfig(mqttConfig);
@@ -199,6 +202,9 @@ void initialiseMqtt(byte * mac)
 
 void mqttCallback(char * topic, byte * payload, int length) 
 {
+  // Indicate we have received something on MQTT
+  screen.trigger_mqtt_rx_led();
+  
   // Pass this message down to our MQTT handler
   mqtt.receive(topic, payload, length);
 }
@@ -288,10 +294,10 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   char eventType[7];
   getEventType(eventType, type, state);
 
-  // show event on screen bottom line
-  char event[32];
-  sprintf_P(event, PSTR("IDX:%2d %s %s   "), index, inputType, eventType);
-  screen.show_event (event);
+  // Show event on screen
+  char display[32];
+  sprintf_P(display, PSTR("idx:%2d %s %s   "), index, inputType, eventType);
+  screen.show_event(display);
 
   // Build JSON payload for this event
   StaticJsonDocument<128> json;
@@ -302,9 +308,32 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   json["event"] = eventType;
 
   // Publish to MQTT
-  if (!mqtt.publishStatus(json.as<JsonObject>()))
+  if (mqtt.publishStatus(json.as<JsonObject>()))
   {
+    // Indicate we have sent something on MQTT
+    screen.trigger_mqtt_tx_led();
+  }
+  else
+  {
+    // TODO: add any failover handling in here!
     Serial.println("FAILOVER!!!");    
+  }
+}
+
+void publishTemperature(float temperature)
+{
+  char payload[8];
+  sprintf(payload, "%2.2f", temperature);
+
+  // Build JSON payload for this event
+  StaticJsonDocument<64> json;
+  json["temperature"] = payload;
+  
+  // Publish to MQTT
+  if (mqtt.publishTelemetry(json.as<JsonObject>()))
+  {
+    // Indicate we have sent something on MQTT
+    screen.trigger_mqtt_tx_led();
   }
 }
 
