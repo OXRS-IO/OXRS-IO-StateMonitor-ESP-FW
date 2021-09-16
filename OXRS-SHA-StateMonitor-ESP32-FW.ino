@@ -250,11 +250,11 @@ void mqttConfig(JsonObject json)
   {
     if (json["invert"].isNull())
     {
-      oxrsInput[mcp].setInvert(pin, 0);
+      oxrsInput[mcp].setInvert(pin, false);
     }
     else
     {
-      oxrsInput[mcp].setInvert(pin, json["invert"]);
+      oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
     }
   }
 }
