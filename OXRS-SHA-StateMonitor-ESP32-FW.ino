@@ -59,7 +59,7 @@
 uint8_t g_mcps_found = 0;
 
 // temperature update interval timer
-uint32_t g_last_temp_update = -TEMP_UPDATE_INTERVAL;
+uint32_t g_last_temp_update = -TEMP_UPDATE_INTERVAL_MS;
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -158,7 +158,7 @@ void loop()
 
 void updateTemperature()
 {
-  if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL)
+  if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL_MS)
   {
     // TODO: read temp from onboard sensor
     float temperature;

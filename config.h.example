@@ -10,7 +10,7 @@ const char *  MQTT_PASSWORD         = NULL;                 // Optional, NULL if
 const char *  MQTT_TOPIC_PREFIX     = NULL;                 // Optional, NULL if no prefix in topic path
 const char *  MQTT_TOPIC_SUFFIX     = NULL;                 // Optional, NULL if no suffix in topic path
 
-#define       TEMP_UPDATE_INTERVAL    60000L                // Read and publish temp (milliseconds)
+#define       TEMP_UPDATE_INTERVAL_MS 60000L                // Read and publish temp (milliseconds)
 
 /* ----------------- Hardware-specific config ---------------------- */
 /* Serial */
