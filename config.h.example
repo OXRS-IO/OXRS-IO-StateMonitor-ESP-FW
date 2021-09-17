@@ -10,7 +10,7 @@ const char *  MQTT_PASSWORD         = NULL;                 // Optional, NULL if
 const char *  MQTT_TOPIC_PREFIX     = NULL;                 // Optional, NULL if no prefix in topic path
 const char *  MQTT_TOPIC_SUFFIX     = NULL;                 // Optional, NULL if no suffix in topic path
 
-#define       TEMP_UPDATE_INTERVAL    60000L                // How often the temperature sensor is read and published
+#define       TEMP_UPDATE_INTERVAL    60000L                // Read and publish temp (milliseconds)
 
 /* ----------------- Hardware-specific config ---------------------- */
 /* Serial */
@@ -28,17 +28,9 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 #define       ETHERNET_CS_PIN         26                    // Rack32 (ESP32) with W5500
 #define       WIZNET_RESET_PIN        13                    // Comment out if no Wiznet reset pin
 
-/* Optional, otherwise get MAC from ESP32 (or DEADBEEFFEED for non-ESP32) */
-//const byte    STATIC_MAC[]          = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-
-/* Optional, otherwise get IP/DNS from DHCP */
-//const byte    STATIC_IP[]           = { 192, 168, 1, 35 };
-//const byte    STATIC_DNS[]          = { 192, 168, 1, 1 };
-
 /* NOTE: If using an EtherMega (ATmega2560) with W5100;
  *  - Set ETHERNET_CS_PIN to 10 
  *  - Comment out WIZNET_RESET_PIN
- *  - Uncomment STATIC_MAC
  */
  
 #endif
