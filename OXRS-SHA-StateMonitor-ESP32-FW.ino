@@ -248,17 +248,13 @@ void mqttConfig(JsonObject json)
   
   if (json.containsKey("invert"))
   {
-    if (json["invert"].isNull() || strcmp(json["invert"], "off"))
+    if (json["invert"].isNull())
     {
-      oxrsInput[mcp].setInvert(pin, 0);
+      oxrsInput[mcp].setInvert(pin, false);
     }
-    else if (strcmp(json["invert"], "on"))
+    else
     {
-      oxrsInput[mcp].setInvert(pin, 1);
-    }
-    else 
-    {
-      Serial.println(F("[erro] invalid invert"));
+      oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
     }
   }
 }
