@@ -59,7 +59,7 @@
 uint8_t g_mcps_found = 0;
 
 // temperature update interval timer
-uint32_t g_last_temp_update = -TEMP_UPDATE_INTERVAL;
+uint32_t g_last_temp_update = -TEMP_UPDATE_INTERVAL_MS;
 
 /*--------------------------- Function Signatures ------------------------*/
 void mqttCallback(char * topic, byte * payload, int length);
@@ -158,7 +158,7 @@ void loop()
 
 void updateTemperature()
 {
-  if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL)
+  if ((millis() - g_last_temp_update) > TEMP_UPDATE_INTERVAL_MS)
   {
     // TODO: read temp from onboard sensor
     float temperature;
@@ -182,15 +182,10 @@ void initialiseMqtt(byte * mac)
   // Set the MQTT client id to the f/w code + MAC address
   mqtt.setClientId(FW_CODE, mac);
 
-#ifdef MQTT_USERNAME
-  mqtt.setAuth(MQTT_USERNAME, MQTT_PASSWORD);
-#endif
-#ifdef MQTT_TOPIC_PREFIX
-  mqtt.setTopicPrefix(MQTT_TOPIC_PREFIX);
-#endif
-#ifdef MQTT_TOPIC_SUFFIX
-  mqtt.setTopicSuffix(MQTT_TOPIC_SUFFIX);
-#endif
+  // Set credentials and any extra topic parts specified
+  if (MQTT_USERNAME     != NULL) { mqtt.setAuth(MQTT_USERNAME, MQTT_PASSWORD); }
+  if (MQTT_TOPIC_PREFIX != NULL) { mqtt.setTopicPrefix(MQTT_TOPIC_PREFIX); }
+  if (MQTT_TOPIC_SUFFIX != NULL) { mqtt.setTopicSuffix(MQTT_TOPIC_SUFFIX); }
 
   // Display the MQTT topic on screen
   char topic[64];
@@ -487,10 +482,7 @@ void scanI2CBus()
 void initialiseEthernet(byte * ethernet_mac)
 {
   // Determine MAC address
-#ifdef STATIC_MAC
-  Serial.print(F("Using static MAC address: "));
-  memcpy(ethernet_mac, STATIC_MAC, sizeof(ethernet_mac));
-#elif ARDUINO_ARCH_ESP32
+#if ARDUINO_ARCH_ESP32
   Serial.print(F("Getting Ethernet MAC address from ESP32: "));
   WiFi.macAddress(ethernet_mac);  // Temporarily populate Ethernet MAC with ESP32 Base MAC
   ethernet_mac[5] += 3;           // Ethernet MAC is Base MAC + 3 (see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/system.html#mac-address)
@@ -528,13 +520,8 @@ void initialiseEthernet(byte * ethernet_mac)
 #endif
 
   // Obtain IP address
-#ifdef STATIC_IP
-  Serial.print(F("Using static IP address: "));
-  Ethernet.begin(ethernet_mac, STATIC_IP, STATIC_DNS);
-#else
   Serial.print(F("Getting IP address via DHCP: "));
   Ethernet.begin(ethernet_mac, 10000);
-#endif
 
   // Display IP address on serial
   Serial.println(Ethernet.localIP());
