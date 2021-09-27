@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER_CODE "SHA"
-#define FW_VERSION    "1.2.0"
+#define FW_VERSION    "1.2.1"
 #define FW_CODE       "osm"
 
 /*--------------------------- Configuration ------------------------------*/
@@ -193,7 +193,7 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
 {
   // Calculate the port and channel for this index (all 1-based)
   uint8_t port = ((index - 1) / 4) + 1;
-  uint8_t channel = ((index - 1) % 16) + 1;
+  uint8_t channel = index - ((port - 1) * 4);
   
   char inputType[8];
   getInputType(inputType, type);
