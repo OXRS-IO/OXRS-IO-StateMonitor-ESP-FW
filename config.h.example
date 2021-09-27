@@ -1,7 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/* ----------------- General config -------------------------------- */
+/* I2C */
+#define       I2C_CLOCK_SPEED         400000L
+
 /* MQTT */
 const char *  MQTT_BROKER           = "test.mosquitto.org"; // MQTT broker IP address or host name
 const int     MQTT_PORT             = 1883;                 // MQTT broker port (default 1883)
@@ -10,27 +12,7 @@ const char *  MQTT_PASSWORD         = NULL;                 // Optional, NULL if
 const char *  MQTT_TOPIC_PREFIX     = NULL;                 // Optional, NULL if no prefix in topic path
 const char *  MQTT_TOPIC_SUFFIX     = NULL;                 // Optional, NULL if no suffix in topic path
 
-#define       TEMP_UPDATE_INTERVAL_MS 60000L                // Read and publish temp (milliseconds)
+/* MCP23017 - uncomment for old LSC breakouts with no external pullups */
+//#define       MCP_INTERNAL_PULLUPS 
 
-/* ----------------- Hardware-specific config ---------------------- */
-/* Serial */
-#define       SERIAL_BAUD_RATE        115200
-
-/* I2C */
-#define       I2C_CLOCK_SPEED         400000L
-
-/* MCP23017 */
-const byte    MCP_I2C_ADDRESS[]     = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27 };
-const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
-#define       MCP_INTERNAL_PULLUPS    false                 // Enable if using an old LSC breakout with no external pullups
-
-/* Ethernet */
-#define       ETHERNET_CS_PIN         26                    // Rack32 (ESP32) with W5500
-#define       WIZNET_RESET_PIN        13                    // Comment out if no Wiznet reset pin
-
-/* NOTE: If using an EtherMega (ATmega2560) with W5100;
- *  - Set ETHERNET_CS_PIN to 10 
- *  - Comment out WIZNET_RESET_PIN
- */
- 
 #endif
