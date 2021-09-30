@@ -47,6 +47,9 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 // Each MCP23017 has 16 I/O pins
 #define       MCP_PIN_COUNT         16
 
+// Speed up the I2C bus to get faster event handling
+#define       I2C_CLOCK_SPEED         400000L
+
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
@@ -83,11 +86,9 @@ void setup()
   rack32.setDisplayPorts(g_mcps_found, PORT_LAYOUT_INPUT_128);
 
   // Speed up I2C clock for faster scan rate (after bus scan)
-  #ifdef I2C_CLOCK_SPEED
-    Serial.print(F("[i2c ] setting I2C clock speed to "));
-    Serial.println(I2C_CLOCK_SPEED);
-    Wire.setClock(I2C_CLOCK_SPEED);
-  #endif
+  Serial.print(F("[i2c ] setting I2C clock speed to "));
+  Serial.println(I2C_CLOCK_SPEED);
+  Wire.setClock(I2C_CLOCK_SPEED);
 }
 
 /**
