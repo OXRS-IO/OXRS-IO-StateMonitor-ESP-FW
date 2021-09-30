@@ -48,7 +48,7 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 #define       MCP_PIN_COUNT         16
 
 // Speed up the I2C bus to get faster event handling
-#define       I2C_CLOCK_SPEED         400000L
+#define       I2C_CLOCK_SPEED       400000L
 
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
