@@ -84,7 +84,7 @@ void setup()
 
   // Speed up I2C clock for faster scan rate (after bus scan)
   #ifdef I2C_CLOCK_SPEED
-    Serial.print(F("Setting I2C clock speed to "));
+    Serial.print(F("[i2c ] setting I2C clock speed to "));
     Serial.println(I2C_CLOCK_SPEED);
     Wire.setClock(I2C_CLOCK_SPEED);
   #endif
@@ -325,7 +325,7 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 */
 void scanI2CBus()
 {
-  Serial.println(F("Scanning for MCP23017s on I2C bus..."));
+  Serial.println(F("[i2c ] scanning for I/O buffers..."));
 
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
