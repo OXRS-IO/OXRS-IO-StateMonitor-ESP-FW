@@ -28,7 +28,6 @@
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER_CODE "SHA"
 #define FW_VERSION    "1.2.1"
-#define FW_CODE       "osm"
 
 /*--------------------------- Configuration ------------------------------*/
 // Should be no user configuration in this file, everything should be in;
@@ -56,7 +55,7 @@ uint8_t g_mcps_found = 0;
 
 /*--------------------------- Instantiate Global Objects -----------------*/
 // Rack32 handler
-OXRS_Rack32 rack32(FW_NAME, FW_SHORT_NAME, FW_MAKER_CODE, FW_VERSION, FW_CODE);
+OXRS_Rack32 rack32(FW_NAME, FW_SHORT_NAME, FW_MAKER_CODE, FW_VERSION);
 
 // I/O buffers
 Adafruit_MCP23X17 mcp23017[MCP_COUNT];
