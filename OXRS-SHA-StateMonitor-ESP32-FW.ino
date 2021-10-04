@@ -75,6 +75,28 @@ void setup()
   rack32.setMqttTopicPrefix(MQTT_TOPIC_PREFIX);
   rack32.setMqttTopicSuffix(MQTT_TOPIC_SUFFIX);
   
+  DynamicJsonDocument config(2048);
+
+  JsonObject mcpInternalPullups = config.createNestedObject("mcpInternalPullups");
+  mcpInternalPullups.getOrAddMember("type").set("bool");
+  mcpInternalPullups.getOrAddMember("description").set("Set true to enable internal pull-ups on MCP23017 chips");
+
+  JsonObject boardDefinition = config.createNestedObject("boardDefinition");
+  boardDefinition.getOrAddMember("ports").set(16);
+
+  JsonObject portDefinition = boardDefinition.createNestedObject("portDefinition");
+  JsonArray portType = portDefinition.createNestedArray("type");
+  portType.add("button");
+  portType.add("contact");
+  portType.add("rotary");
+  portType.add("switch");
+  portType.add("toggle");
+  JsonArray portInvert = portDefinition.createNestedArray("invert");
+  portInvert.add(true);
+  portInvert.add(false);
+
+  rack32.setDeviceConfig(config.as<JsonObject>());
+
   // Start Rack32 hardware
   rack32.begin(jsonConfig, NULL);
 
@@ -121,73 +143,66 @@ void loop()
  */
 void jsonConfig(JsonObject json)
 {
-  if (json.containsKey("index"))
+  uint8_t index = getIndex(json);
+  if (index == 0) return;
+
+  // Work out the MCP and pin we are configuring
+  int mcp = (index - 1) / MCP_PIN_COUNT;
+  int pin = (index - 1) % MCP_PIN_COUNT;
+
+  if (json.containsKey("type"))
   {
-    uint8_t index = checkIndex(json["index"].as<uint8_t>());
-    if (index == 0) return;
-  
-    // Work out the MCP and pin we are configuring
-    int mcp = (index - 1) / MCP_PIN_COUNT;
-    int pin = (index - 1) % MCP_PIN_COUNT;
-  
-    if (json.containsKey("type"))
+    if (json["type"].isNull() || strcmp(json["type"], "switch") == 0)
     {
-      if (json["type"].isNull() || strcmp(json["type"], "switch") == 0)
-      {
-        oxrsInput[mcp].setType(pin, SWITCH);
-      }
-      else if (strcmp(json["type"], "button") == 0)
-      {
-        oxrsInput[mcp].setType(pin, BUTTON);
-      }
-      else if (strcmp(json["type"], "contact") == 0)
-      {
-        oxrsInput[mcp].setType(pin, CONTACT);
-      }
-      else if (strcmp(json["type"], "rotary") == 0)
-      {
-        oxrsInput[mcp].setType(pin, ROTARY);
-      }
-      else if (strcmp(json["type"], "toggle") == 0)
-      {
-        oxrsInput[mcp].setType(pin, TOGGLE);
-      }
-      else 
-      {
-        Serial.println(F("[erro] invalid input type"));
-      }
+      oxrsInput[mcp].setType(pin, SWITCH);
     }
-    
-    if (json.containsKey("invert"))
+    else if (strcmp(json["type"], "button") == 0)
     {
-      if (json["invert"].isNull())
-      {
-        oxrsInput[mcp].setInvert(pin, false);
-      }
-      else
-      {
-        oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
-      }
+      oxrsInput[mcp].setType(pin, BUTTON);
+    }
+    else if (strcmp(json["type"], "contact") == 0)
+    {
+      oxrsInput[mcp].setType(pin, CONTACT);
+    }
+    else if (strcmp(json["type"], "rotary") == 0)
+    {
+      oxrsInput[mcp].setType(pin, ROTARY);
+    }
+    else if (strcmp(json["type"], "toggle") == 0)
+    {
+      oxrsInput[mcp].setType(pin, TOGGLE);
+    }
+    else 
+    {
+      Serial.println(F("[erro] invalid input type"));
     }
   }
-
-  if (json.containsKey("mcpInternalPullups"))
+  
+  if (json.containsKey("invert"))
   {
-    initialiseInputs(json["mcpInternalPullups"].as<bool>());
+    if (json["invert"].isNull())
+    {
+      oxrsInput[mcp].setInvert(pin, false);
+    }
+    else
+    {
+      oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
+    }
   }
 }
 
-uint8_t checkIndex(uint8_t index)
+uint8_t getIndex(JsonObject json)
 {
-  // Count how many MCPs were found
-  uint8_t mcpCount = 0;
-  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
+  if (!json.containsKey("index"))
   {
-    if (bitRead(g_mcps_found, mcp) != 0) { mcpCount++; }
+    Serial.println(F("[erro] missing index"));
+    return 0;
   }
   
+  uint8_t index = json["index"].as<uint8_t>();
+  
   // Check the index is valid for this device
-  if (index <= 0 || index > (mcpCount * MCP_PIN_COUNT))
+  if (index <= 0 || index > (MCP_COUNT * MCP_PIN_COUNT))
   {
     Serial.println(F("[erro] invalid index"));
     return 0;
@@ -313,6 +328,7 @@ void getEventType(char eventType[], uint8_t type, uint8_t state)
   }
 }
 
+
 /**
   Event handlers
 */
@@ -331,7 +347,7 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 */
 void scanI2CBus()
 {
-  Serial.println(F("[i2c ] scanning for I/O buffers..."));
+  Serial.println(F("Scanning for MCP23017s on I2C bus..."));
 
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
@@ -345,49 +361,29 @@ void scanI2CBus()
     {
       bitWrite(g_mcps_found, mcp, 1);
       
-      // If an MCP23017 was found then initialise
+      // If an MCP23017 was found then initialise and configure the inputs
       mcp23017[mcp].begin_I2C(MCP_I2C_ADDRESS[mcp]);
+      for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
+      {
+        #ifdef MCP_INTERNAL_PULLUPS
+          mcp23017[mcp].pinMode(pin, INPUT_PULLUP);
+        #else
+          mcp23017[mcp].pinMode(pin, INPUT);
+        #endif
+      }
 
       // Listen for input events
       oxrsInput[mcp].onEvent(inputEvent);
 
-      Serial.println(F("MCP23017"));
+      Serial.print(F("MCP23017"));
+      #ifdef MCP_INTERNAL_PULLUPS
+        Serial.print(F(" (internal pullups)"));
+      #endif
+      Serial.println();
     }
     else
     {
       Serial.println(F("empty"));
-    }
-  }
-
-  // Initialise the MCP input pins (assume external pullups)
-  initialiseInputs(false);
-}
-
-void initialiseInputs(bool internalPullups)
-{
-  // Exit early if nothing to initialise
-  if (g_mcps_found == 0) return;
-  
-  // Configurable flag for using the internal pullups on the MCPs
-  // Not needed for newer LSC PCBs as Jon added external pullups
-  Serial.print(F("[mcp ] initialising inputs"));
-  if (internalPullups)
-  {
-    Serial.println(F(" (internal pullups)"));
-  }
-  else
-  {
-    Serial.println(F(" (external pullups)"));
-  }
-
-  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
-  {
-    if (bitRead(g_mcps_found, mcp) == 0)
-      continue;
-  
-    for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
-    {
-      mcp23017[mcp].pinMode(pin, internalPullups ? INPUT_PULLUP : INPUT);
     }
   }
 }
