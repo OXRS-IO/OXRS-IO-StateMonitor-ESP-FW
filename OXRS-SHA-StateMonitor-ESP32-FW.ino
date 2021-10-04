@@ -26,8 +26,7 @@
 /*--------------------------- Version ------------------------------------*/
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
-#define FW_MAKER_CODE "SHA"
-#define FW_MAKER_NAME "SuperHouse Automation"
+#define FW_MAKER      "SuperHouse Automation"
 #define FW_VERSION    "1.2.1"
 #define FW_CODE       "osm"
 
@@ -54,7 +53,7 @@ uint8_t g_mcps_found = 0;
 
 /*--------------------------- Instantiate Global Objects -----------------*/
 // Rack32 handler
-OXRS_Rack32 rack32(FW_NAME, FW_SHORT_NAME, FW_MAKER_CODE, FW_MAKER_NAME, FW_VERSION);
+OXRS_Rack32 rack32(FW_NAME, FW_SHORT_NAME, FW_MAKER, FW_VERSION);
 
 // I/O buffers
 Adafruit_MCP23X17 mcp23017[MCP_COUNT];
