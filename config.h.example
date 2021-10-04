@@ -1,9 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/* I2C */
-#define       I2C_CLOCK_SPEED         400000L
-
 /* MQTT */
 const char *  MQTT_BROKER           = "test.mosquitto.org"; // MQTT broker IP address or host name
 const int     MQTT_PORT             = 1883;                 // MQTT broker port (default 1883)
@@ -11,8 +8,5 @@ const char *  MQTT_USERNAME         = NULL;                 // Optional, NULL if
 const char *  MQTT_PASSWORD         = NULL;                 // Optional, NULL if no authentication
 const char *  MQTT_TOPIC_PREFIX     = NULL;                 // Optional, NULL if no prefix in topic path
 const char *  MQTT_TOPIC_SUFFIX     = NULL;                 // Optional, NULL if no suffix in topic path
-
-/* MCP23017 - uncomment for old LSC breakouts with no external pullups */
-//#define       MCP_INTERNAL_PULLUPS 
 
 #endif

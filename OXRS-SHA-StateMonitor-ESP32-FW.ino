@@ -28,7 +28,6 @@
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
 #define FW_VERSION    "1.2.1"
-#define FW_CODE       "osm"
 
 /*--------------------------- Configuration ------------------------------*/
 // Should be no user configuration in this file, everything should be in;
@@ -46,6 +45,9 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 
 // Each MCP23017 has 16 I/O pins
 #define       MCP_PIN_COUNT         16
+
+// Speed up the I2C bus to get faster event handling
+#define       I2C_CLOCK_SPEED       400000L
 
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
@@ -83,11 +85,9 @@ void setup()
   rack32.setDisplayPorts(g_mcps_found, PORT_LAYOUT_INPUT_128);
 
   // Speed up I2C clock for faster scan rate (after bus scan)
-  #ifdef I2C_CLOCK_SPEED
-    Serial.print(F("Setting I2C clock speed to "));
-    Serial.println(I2C_CLOCK_SPEED);
-    Wire.setClock(I2C_CLOCK_SPEED);
-  #endif
+  Serial.print(F("[i2c ] setting I2C clock speed to "));
+  Serial.println(I2C_CLOCK_SPEED);
+  Wire.setClock(I2C_CLOCK_SPEED);
 }
 
 /**
@@ -121,66 +121,73 @@ void loop()
  */
 void jsonConfig(JsonObject json)
 {
-  uint8_t index = getIndex(json);
-  if (index == 0) return;
-
-  // Work out the MCP and pin we are configuring
-  int mcp = (index - 1) / MCP_PIN_COUNT;
-  int pin = (index - 1) % MCP_PIN_COUNT;
-
-  if (json.containsKey("type"))
+  if (json.containsKey("index"))
   {
-    if (json["type"].isNull() || strcmp(json["type"], "switch") == 0)
+    uint8_t index = checkIndex(json["index"].as<uint8_t>());
+    if (index == 0) return;
+  
+    // Work out the MCP and pin we are configuring
+    int mcp = (index - 1) / MCP_PIN_COUNT;
+    int pin = (index - 1) % MCP_PIN_COUNT;
+  
+    if (json.containsKey("type"))
     {
-      oxrsInput[mcp].setType(pin, SWITCH);
+      if (json["type"].isNull() || strcmp(json["type"], "switch") == 0)
+      {
+        oxrsInput[mcp].setType(pin, SWITCH);
+      }
+      else if (strcmp(json["type"], "button") == 0)
+      {
+        oxrsInput[mcp].setType(pin, BUTTON);
+      }
+      else if (strcmp(json["type"], "contact") == 0)
+      {
+        oxrsInput[mcp].setType(pin, CONTACT);
+      }
+      else if (strcmp(json["type"], "rotary") == 0)
+      {
+        oxrsInput[mcp].setType(pin, ROTARY);
+      }
+      else if (strcmp(json["type"], "toggle") == 0)
+      {
+        oxrsInput[mcp].setType(pin, TOGGLE);
+      }
+      else 
+      {
+        Serial.println(F("[erro] invalid input type"));
+      }
     }
-    else if (strcmp(json["type"], "button") == 0)
+    
+    if (json.containsKey("invert"))
     {
-      oxrsInput[mcp].setType(pin, BUTTON);
-    }
-    else if (strcmp(json["type"], "contact") == 0)
-    {
-      oxrsInput[mcp].setType(pin, CONTACT);
-    }
-    else if (strcmp(json["type"], "rotary") == 0)
-    {
-      oxrsInput[mcp].setType(pin, ROTARY);
-    }
-    else if (strcmp(json["type"], "toggle") == 0)
-    {
-      oxrsInput[mcp].setType(pin, TOGGLE);
-    }
-    else 
-    {
-      Serial.println(F("[erro] invalid input type"));
+      if (json["invert"].isNull())
+      {
+        oxrsInput[mcp].setInvert(pin, false);
+      }
+      else
+      {
+        oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
+      }
     }
   }
-  
-  if (json.containsKey("invert"))
+
+  if (json.containsKey("mcpInternalPullups"))
   {
-    if (json["invert"].isNull())
-    {
-      oxrsInput[mcp].setInvert(pin, false);
-    }
-    else
-    {
-      oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
-    }
+    initialiseInputs(json["mcpInternalPullups"].as<bool>());
   }
 }
 
-uint8_t getIndex(JsonObject json)
+uint8_t checkIndex(uint8_t index)
 {
-  if (!json.containsKey("index"))
+  // Count how many MCPs were found
+  uint8_t mcpCount = 0;
+  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
-    Serial.println(F("[erro] missing index"));
-    return 0;
+    if (bitRead(g_mcps_found, mcp) != 0) { mcpCount++; }
   }
   
-  uint8_t index = json["index"].as<uint8_t>();
-  
   // Check the index is valid for this device
-  if (index <= 0 || index > (MCP_COUNT * MCP_PIN_COUNT))
+  if (index <= 0 || index > (mcpCount * MCP_PIN_COUNT))
   {
     Serial.println(F("[erro] invalid index"));
     return 0;
@@ -306,7 +313,6 @@ void getEventType(char eventType[], uint8_t type, uint8_t state)
   }
 }
 
-
 /**
   Event handlers
 */
@@ -325,7 +331,7 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 */
 void scanI2CBus()
 {
-  Serial.println(F("Scanning for MCP23017s on I2C bus..."));
+  Serial.println(F("[i2c ] scanning for I/O buffers..."));
 
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
@@ -339,29 +345,49 @@ void scanI2CBus()
     {
       bitWrite(g_mcps_found, mcp, 1);
       
-      // If an MCP23017 was found then initialise and configure the inputs
+      // If an MCP23017 was found then initialise
       mcp23017[mcp].begin_I2C(MCP_I2C_ADDRESS[mcp]);
-      for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
-      {
-        #ifdef MCP_INTERNAL_PULLUPS
-          mcp23017[mcp].pinMode(pin, INPUT_PULLUP);
-        #else
-          mcp23017[mcp].pinMode(pin, INPUT);
-        #endif
-      }
 
       // Listen for input events
       oxrsInput[mcp].onEvent(inputEvent);
 
-      Serial.print(F("MCP23017"));
-      #ifdef MCP_INTERNAL_PULLUPS
-        Serial.print(F(" (internal pullups)"));
-      #endif
-      Serial.println();
+      Serial.println(F("MCP23017"));
     }
     else
     {
       Serial.println(F("empty"));
+    }
+  }
+
+  // Initialise the MCP input pins (assume external pullups)
+  initialiseInputs(false);
+}
+
+void initialiseInputs(bool internalPullups)
+{
+  // Exit early if nothing to initialise
+  if (g_mcps_found == 0) return;
+  
+  // Configurable flag for using the internal pullups on the MCPs
+  // Not needed for newer LSC PCBs as Jon added external pullups
+  Serial.print(F("[mcp ] initialising inputs"));
+  if (internalPullups)
+  {
+    Serial.println(F(" (internal pullups)"));
+  }
+  else
+  {
+    Serial.println(F(" (external pullups)"));
+  }
+
+  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
+  {
+    if (bitRead(g_mcps_found, mcp) == 0)
+      continue;
+  
+    for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
+    {
+      mcp23017[mcp].pinMode(pin, internalPullups ? INPUT_PULLUP : INPUT);
     }
   }
 }
