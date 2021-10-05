@@ -29,10 +29,6 @@
 #define FW_MAKER      "SuperHouse Automation"
 #define FW_VERSION    "1.2.1"
 
-/*--------------------------- Configuration ------------------------------*/
-// Should be no user configuration in this file, everything should be in;
-#include "config.h"
-
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
 #include <OXRS_Rack32.h>              // Rack32 support
@@ -69,12 +65,6 @@ OXRS_Input oxrsInput[MCP_COUNT];
 */
 void setup()
 {
-  // Set up Rack32 config
-  rack32.setMqttBroker(MQTT_BROKER, MQTT_PORT);
-  rack32.setMqttAuth(MQTT_USERNAME, MQTT_PASSWORD);
-  rack32.setMqttTopicPrefix(MQTT_TOPIC_PREFIX);
-  rack32.setMqttTopicSuffix(MQTT_TOPIC_SUFFIX);
-  
   // Start Rack32 hardware
   rack32.begin(jsonConfig, NULL);
 
