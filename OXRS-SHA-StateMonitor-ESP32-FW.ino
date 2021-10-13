@@ -27,13 +27,13 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "2.0.0"
+#define FW_VERSION    "2.1.0"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
 #include <OXRS_Rack32.h>              // Rack32 support
 #include <OXRS_Input.h>               // For input handling
-
+#include "logo.h"                     // embedded maker supplied logo
 /*--------------------------- Constants ----------------------------------*/
 // Can have up to 8x MCP23017s on a single I2C bus
 const byte    MCP_I2C_ADDRESS[]     = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27 };
@@ -54,7 +54,7 @@ uint8_t g_mcps_found = 0;
 
 /*--------------------------- Instantiate Global Objects -----------------*/
 // Rack32 handler
-OXRS_Rack32 rack32(FW_NAME, FW_SHORT_NAME, FW_MAKER, FW_VERSION);
+OXRS_Rack32 rack32(FW_NAME, FW_SHORT_NAME, FW_MAKER, FW_VERSION, logo);
 
 // I/O buffers
 Adafruit_MCP23X17 mcp23017[MCP_COUNT];
