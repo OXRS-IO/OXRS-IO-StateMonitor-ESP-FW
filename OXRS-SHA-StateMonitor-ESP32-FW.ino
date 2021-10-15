@@ -43,8 +43,8 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 // Each MCP23017 has 16 I/O pins
 #define       MCP_PIN_COUNT         16
 
-// Set true for LSC breakout boards with no external pull-ups
-#define       MCP_INTERNAL_PULLUPS  false
+// Set false for breakout boards with external pull-ups
+#define       MCP_INTERNAL_PULLUPS  true
 
 // Speed up the I2C bus to get faster event handling
 #define       I2C_CLOCK_SPEED       400000L
