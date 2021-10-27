@@ -120,9 +120,11 @@ void setConfigSchema()
 {
   // Define our config schema
   StaticJsonDocument<1024> json;
-  json["type"] = "array";
+
+  JsonObject inputs = json.createNestedObject("inputs");
+  inputs["type"] = "array";
   
-  JsonObject items = json.createNestedObject("items");
+  JsonObject items = inputs.createNestedObject("items");
   items["type"] = "object";
 
   JsonObject properties = items.createNestedObject("properties");
@@ -151,6 +153,17 @@ void setConfigSchema()
 }
 
 void jsonConfig(JsonVariant json)
+{
+  if (json.containsKey("inputs"))
+  {
+    for (JsonVariant input : json["inputs"].as<JsonArray>())
+    {
+      jsonInput(input);    
+    }
+  }
+}
+
+void jsonInput(JsonVariant json)
 {
   uint8_t index = getIndex(json);
   if (index == 0) return;
