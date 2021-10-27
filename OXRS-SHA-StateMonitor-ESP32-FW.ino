@@ -78,6 +78,9 @@ void setup()
   // Set up port display
   rack32.setDisplayPorts(g_mcps_found, PORT_LAYOUT_INPUT_128);
 
+  // Set up config schema (for self-discovery and adoption)
+  setConfigSchema();
+  
   // Speed up I2C clock for faster scan rate (after bus scan)
   Serial.print(F("[osm ] setting I2C clock speed to "));
   Serial.println(I2C_CLOCK_SPEED);
@@ -113,7 +116,41 @@ void loop()
 /**
   Config handler
  */
-void jsonConfig(JsonObject json)
+void setConfigSchema()
+{
+  // Define our config schema
+  StaticJsonDocument<1024> json;
+  json["type"] = "array";
+  
+  JsonObject items = json.createNestedObject("items");
+  items["type"] = "object";
+
+  JsonObject properties = items.createNestedObject("properties");
+
+  JsonObject index = properties.createNestedObject("index");
+  index["type"] = "integer";
+  index["minimum"] = 1;
+  index["maximum"] = getMaxIndex();
+
+  JsonObject type = properties.createNestedObject("type");
+  JsonArray typeEnum = type.createNestedArray("enum");
+  typeEnum.add("button");
+  typeEnum.add("contact");
+  typeEnum.add("rotary");
+  typeEnum.add("switch");
+  typeEnum.add("toggle");
+
+  JsonObject invert = properties.createNestedObject("invert");
+  invert["type"] = "boolean";
+
+  JsonArray required = items.createNestedArray("required");
+  required.add("index");
+
+  // Pass our config schema down to the Rack32 library
+  rack32.setConfigSchema(json.as<JsonVariant>());
+}
+
+void jsonConfig(JsonVariant json)
 {
   uint8_t index = getIndex(json);
   if (index == 0) return;
@@ -163,7 +200,20 @@ void jsonConfig(JsonObject json)
   }
 }
 
-uint8_t getIndex(JsonObject json)
+uint8_t getMaxIndex()
+{
+  // Count how many MCPs were found
+  uint8_t mcpCount = 0;
+  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
+  {
+    if (bitRead(g_mcps_found, mcp) != 0) { mcpCount++; }
+  }
+
+  // Remember our indexes are 1-based
+  return mcpCount * MCP_PIN_COUNT;  
+}
+
+uint8_t getIndex(JsonVariant json)
 {
   if (!json.containsKey("index"))
   {
@@ -173,15 +223,8 @@ uint8_t getIndex(JsonObject json)
   
   uint8_t index = json["index"].as<uint8_t>();
 
-  // Count how many MCPs were found
-  uint8_t mcpCount = 0;
-  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
-  {
-    if (bitRead(g_mcps_found, mcp) != 0) { mcpCount++; }
-  }
-  
   // Check the index is valid for this device
-  if (index <= 0 || index > (mcpCount * MCP_PIN_COUNT))
+  if (index <= 0 || index > getMaxIndex())
   {
     Serial.println(F("[osm ] invalid index"));
     return 0;
@@ -208,7 +251,7 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   json["type"] = inputType;
   json["event"] = eventType;
 
-  if (!rack32.publishStatus(json.as<JsonObject>()))
+  if (!rack32.publishStatus(json.as<JsonVariant>()))
   {
     // TODO: add any failover handling in here!
     Serial.println("FAILOVER!!!");    
