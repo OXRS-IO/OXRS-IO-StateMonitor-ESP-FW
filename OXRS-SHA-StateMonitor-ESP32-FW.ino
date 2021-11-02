@@ -174,11 +174,7 @@ void jsonInputConfig(JsonVariant json)
 
   if (json.containsKey("type"))
   {
-    if (json["type"].isNull() || strcmp(json["type"], "switch") == 0)
-    {
-      oxrsInput[mcp].setType(pin, SWITCH);
-    }
-    else if (strcmp(json["type"], "button") == 0)
+    if (strcmp(json["type"], "button") == 0)
     {
       oxrsInput[mcp].setType(pin, BUTTON);
     }
@@ -189,6 +185,10 @@ void jsonInputConfig(JsonVariant json)
     else if (strcmp(json["type"], "rotary") == 0)
     {
       oxrsInput[mcp].setType(pin, ROTARY);
+    }
+    else if (strcmp(json["type"], "switch") == 0)
+    {
+      oxrsInput[mcp].setType(pin, SWITCH);
     }
     else if (strcmp(json["type"], "toggle") == 0)
     {
@@ -202,14 +202,7 @@ void jsonInputConfig(JsonVariant json)
   
   if (json.containsKey("invert"))
   {
-    if (json["invert"].isNull())
-    {
-      oxrsInput[mcp].setInvert(pin, false);
-    }
-    else
-    {
-      oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
-    }
+    oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
   }
 }
 
@@ -402,8 +395,8 @@ void scanI2CBus()
         mcp23017[mcp].pinMode(pin, MCP_INTERNAL_PULLUPS ? INPUT_PULLUP : INPUT);
       }
 
-      // Listen for input events
-      oxrsInput[mcp].onEvent(inputEvent);
+      // Initialise input handlers (default to TOGGLE)
+      oxrsInput[mcp].begin(inputEvent, TOGGLE);
 
       Serial.print(F("MCP23017"));
       if (MCP_INTERNAL_PULLUPS) { Serial.print(F(" (internal pullups)")); }
