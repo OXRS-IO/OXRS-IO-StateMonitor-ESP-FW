@@ -402,8 +402,8 @@ void scanI2CBus()
         mcp23017[mcp].pinMode(pin, MCP_INTERNAL_PULLUPS ? INPUT_PULLUP : INPUT);
       }
 
-      // Listen for input events
-      oxrsInput[mcp].onEvent(inputEvent);
+      // Initialise input handlers (default to TOGGLE)
+      oxrsInput[mcp].begin(inputEvent, TOGGLE);
 
       Serial.print(F("MCP23017"));
       if (MCP_INTERNAL_PULLUPS) { Serial.print(F(" (internal pullups)")); }
