@@ -36,6 +36,9 @@
 #include "logo.h"                     // Embedded maker logo
 
 /*--------------------------- Constants ----------------------------------*/
+// Serial
+#define       SERIAL_BAUD_RATE      115200
+
 // Can have up to 8x MCP23017s on a single I2C bus
 const byte    MCP_I2C_ADDRESS[]     = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27 };
 const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
@@ -69,11 +72,23 @@ OXRS_Input oxrsInput[MCP_COUNT];
 */
 void setup()
 {
-  // Start Rack32 hardware
-  rack32.begin(jsonConfig, NULL);
+  // Startup logging to serial
+  Serial.begin(SERIAL_BAUD_RATE);
+  Serial.println();
+  Serial.println(F("==============================="));
+  Serial.println(FW_NAME);
+  Serial.print  (F("             v"));
+  Serial.println(FW_VERSION);
+  Serial.println(F("==============================="));
+
+  // Start the I2C bus
+  Wire.begin();
 
   // Scan the I2C bus and set up I/O buffers
   scanI2CBus();
+
+  // Start Rack32 hardware
+  rack32.begin(jsonConfig, NULL);
 
   // Set up port display
   rack32.setDisplayPorts(g_mcps_found, PORT_LAYOUT_INPUT_128);
