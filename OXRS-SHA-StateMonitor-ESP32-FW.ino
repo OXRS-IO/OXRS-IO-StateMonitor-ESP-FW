@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.1.0"
+#define FW_VERSION    "3.1.1"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -75,11 +75,11 @@ void setup()
   // Startup logging to serial
   Serial.begin(SERIAL_BAUD_RATE);
   Serial.println();
-  Serial.println(F("==============================="));
-  Serial.println(FW_NAME);
-  Serial.print  (F("             v"));
-  Serial.println(FW_VERSION);
-  Serial.println(F("==============================="));
+  Serial.println(F("========================================"));
+  Serial.print  (F("FIRMWARE: ")); Serial.println(FW_NAME);
+  Serial.print  (F("MAKER:    ")); Serial.println(FW_MAKER);
+  Serial.print  (F("VERSION:  ")); Serial.println(FW_VERSION);
+  Serial.println(F("========================================"));
 
   // Start the I2C bus
   Wire.begin();
@@ -97,8 +97,6 @@ void setup()
   setConfigSchema();
   
   // Speed up I2C clock for faster scan rate (after bus scan)
-  Serial.print(F("[osm ] setting I2C clock speed to "));
-  Serial.println(I2C_CLOCK_SPEED);
   Wire.setClock(I2C_CLOCK_SPEED);
 }
 
@@ -211,7 +209,7 @@ void jsonInputConfig(JsonVariant json)
     }
     else 
     {
-      Serial.println(F("[osm ] invalid input type"));
+      Serial.println(F("[smon] invalid input type"));
     }
   }
   
@@ -238,7 +236,7 @@ uint8_t getIndex(JsonVariant json)
 {
   if (!json.containsKey("index"))
   {
-    Serial.println(F("[osm ] missing index"));
+    Serial.println(F("[smon] missing index"));
     return 0;
   }
   
@@ -247,7 +245,7 @@ uint8_t getIndex(JsonVariant json)
   // Check the index is valid for this device
   if (index <= 0 || index > getMaxIndex())
   {
-    Serial.println(F("[osm ] invalid index"));
+    Serial.println(F("[smon] invalid index"));
     return 0;
   }
 
@@ -274,7 +272,7 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
 
   if (!rack32.publishStatus(json.as<JsonVariant>()))
   {
-    Serial.print(F("[osm ] [failover] "));
+    Serial.print(F("[smon] [failover] "));
     serializeJson(json, Serial);
     Serial.println();
 
@@ -392,7 +390,7 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 */
 void scanI2CBus()
 {
-  Serial.println(F("[osm ] scanning for I/O buffers..."));
+  Serial.println(F("[smon] scanning for I/O buffers..."));
 
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
