@@ -144,7 +144,6 @@ void setConfigSchema()
 
   JsonObject index = properties.createNestedObject("index");
   index["type"] = "integer";
-  index["required"] = true;
   index["minimum"] = 1;
   index["maximum"] = getMaxIndex();
 
@@ -158,6 +157,9 @@ void setConfigSchema()
 
   JsonObject invert = properties.createNestedObject("invert");
   invert["type"] = "boolean";
+
+  JsonArray required = items.createNestedArray("required");
+  required.add("index");
 
   // Pass our config schema down to the Rack32 library
   rack32.setConfigSchema(json.as<JsonVariant>());
