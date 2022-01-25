@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.7.0"
+#define FW_VERSION    "3.7.1"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -51,6 +51,9 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 
 // Speed up the I2C bus to get faster event handling
 #define       I2C_CLOCK_SPEED       400000L
+
+// Internal constant used when input type parsing fails
+#define       INVALID_INPUT_TYPE    99
 
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
@@ -134,6 +137,9 @@ void setConfigSchema()
   // Define our config schema
   StaticJsonDocument<1024> json;
 
+  JsonObject defaultInputType = json.createNestedObject("defaultInputType");
+  createInputTypeEnum(defaultInputType);
+
   JsonObject inputs = json.createNestedObject("inputs");
   inputs["type"] = "array";
   
@@ -148,12 +154,7 @@ void setConfigSchema()
   index["maximum"] = getMaxIndex();
 
   JsonObject type = properties.createNestedObject("type");
-  JsonArray typeEnum = type.createNestedArray("enum");
-  typeEnum.add("button");
-  typeEnum.add("contact");
-  typeEnum.add("rotary");
-  typeEnum.add("switch");
-  typeEnum.add("toggle");
+  createInputTypeEnum(type);
 
   JsonObject invert = properties.createNestedObject("invert");
   invert["type"] = "boolean";
@@ -167,6 +168,16 @@ void setConfigSchema()
 
 void jsonConfig(JsonVariant json)
 {
+  if (json.containsKey("defaultInputType"))
+  {
+    uint8_t inputType = parseInputType(json["defaultInputType"]);
+
+    if (inputType != INVALID_INPUT_TYPE)
+    {
+      setDefaultInputType(inputType);
+    }
+  }
+
   if (json.containsKey("inputs"))
   {
     for (JsonVariant input : json["inputs"].as<JsonArray>())
@@ -187,35 +198,55 @@ void jsonInputConfig(JsonVariant json)
 
   if (json.containsKey("type"))
   {
-    if (strcmp(json["type"], "button") == 0)
+    uint8_t inputType = parseInputType(json["type"]);    
+
+    if (inputType != INVALID_INPUT_TYPE)
     {
-      oxrsInput[mcp].setType(pin, BUTTON);
-    }
-    else if (strcmp(json["type"], "contact") == 0)
-    {
-      oxrsInput[mcp].setType(pin, CONTACT);
-    }
-    else if (strcmp(json["type"], "rotary") == 0)
-    {
-      oxrsInput[mcp].setType(pin, ROTARY);
-    }
-    else if (strcmp(json["type"], "switch") == 0)
-    {
-      oxrsInput[mcp].setType(pin, SWITCH);
-    }
-    else if (strcmp(json["type"], "toggle") == 0)
-    {
-      oxrsInput[mcp].setType(pin, TOGGLE);
-    }
-    else 
-    {
-      Serial.println(F("[smon] invalid input type"));
+      oxrsInput[mcp].setType(pin, inputType);
     }
   }
   
   if (json.containsKey("invert"))
   {
     oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
+  }
+}
+
+void createInputTypeEnum(JsonObject parent)
+{
+  JsonArray typeEnum = parent.createNestedArray("enum");
+  
+  typeEnum.add("button");
+  typeEnum.add("contact");
+  typeEnum.add("rotary");
+  typeEnum.add("switch");
+  typeEnum.add("toggle");
+}
+
+uint8_t parseInputType(const char * inputType)
+{
+  if (strcmp(inputType, "button")  == 0) { return BUTTON; }
+  if (strcmp(inputType, "contact") == 0) { return CONTACT; }
+  if (strcmp(inputType, "rotary")  == 0) { return ROTARY; }
+  if (strcmp(inputType, "switch")  == 0) { return SWITCH; }
+  if (strcmp(inputType, "toggle")  == 0) { return TOGGLE; }
+
+  Serial.println(F("[smon] invalid input type"));
+  return INVALID_INPUT_TYPE;
+}
+
+void setDefaultInputType(uint8_t inputType)
+{
+  // Set all pins on all MCPs to this default input type
+  for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
+  {
+    if (bitRead(g_mcps_found, mcp) == 0)
+      continue;
+
+    for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
+    {
+      oxrsInput[mcp].setType(pin, inputType);
+    }
   }
 }
 
