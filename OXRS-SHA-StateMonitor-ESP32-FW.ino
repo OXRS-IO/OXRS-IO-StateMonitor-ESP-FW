@@ -177,7 +177,7 @@ void jsonConfig(JsonVariant json)
       setDefaultInputType(inputType);
     }
   }
-  
+
   if (json.containsKey("inputs"))
   {
     for (JsonVariant input : json["inputs"].as<JsonArray>())
