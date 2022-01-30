@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.7.1"
+#define FW_VERSION    "3.8.0"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -218,6 +218,7 @@ void createInputTypeEnum(JsonObject parent)
   
   typeEnum.add("button");
   typeEnum.add("contact");
+  typeEnum.add("press");
   typeEnum.add("rotary");
   typeEnum.add("switch");
   typeEnum.add("toggle");
@@ -227,6 +228,7 @@ uint8_t parseInputType(const char * inputType)
 {
   if (strcmp(inputType, "button")  == 0) { return BUTTON; }
   if (strcmp(inputType, "contact") == 0) { return CONTACT; }
+  if (strcmp(inputType, "press")   == 0) { return PRESS; }
   if (strcmp(inputType, "rotary")  == 0) { return ROTARY; }
   if (strcmp(inputType, "switch")  == 0) { return SWITCH; }
   if (strcmp(inputType, "toggle")  == 0) { return TOGGLE; }
@@ -323,6 +325,9 @@ void getInputType(char inputType[], uint8_t type)
     case CONTACT:
       sprintf_P(inputType, PSTR("contact"));
       break;
+    case PRESS:
+      sprintf_P(inputType, PSTR("press"));
+      break;
     case ROTARY:
       sprintf_P(inputType, PSTR("rotary"));
       break;
@@ -374,6 +379,9 @@ void getEventType(char eventType[], uint8_t type, uint8_t state)
           sprintf_P(eventType, PSTR("open"));
           break;
       }
+      break;
+    case PRESS:
+      sprintf_P(eventType, PSTR("press"));
       break;
     case ROTARY:
       switch (state)
@@ -442,8 +450,8 @@ void scanI2CBus()
         mcp23017[mcp].pinMode(pin, MCP_INTERNAL_PULLUPS ? INPUT_PULLUP : INPUT);
       }
 
-      // Initialise input handlers (default to TOGGLE)
-      oxrsInput[mcp].begin(inputEvent, TOGGLE);
+      // Initialise input handlers (default to SWITCH)
+      oxrsInput[mcp].begin(inputEvent, SWITCH);
 
       Serial.print(F("MCP23017"));
       if (MCP_INTERNAL_PULLUPS) { Serial.print(F(" (internal pullups)")); }
