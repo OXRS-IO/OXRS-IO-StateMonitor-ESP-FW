@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.8.0"
+#define FW_VERSION    "3.9.0"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -220,18 +220,20 @@ void createInputTypeEnum(JsonObject parent)
   typeEnum.add("contact");
   typeEnum.add("press");
   typeEnum.add("rotary");
+  typeEnum.add("security");
   typeEnum.add("switch");
   typeEnum.add("toggle");
 }
 
 uint8_t parseInputType(const char * inputType)
 {
-  if (strcmp(inputType, "button")  == 0) { return BUTTON; }
-  if (strcmp(inputType, "contact") == 0) { return CONTACT; }
-  if (strcmp(inputType, "press")   == 0) { return PRESS; }
-  if (strcmp(inputType, "rotary")  == 0) { return ROTARY; }
-  if (strcmp(inputType, "switch")  == 0) { return SWITCH; }
-  if (strcmp(inputType, "toggle")  == 0) { return TOGGLE; }
+  if (strcmp(inputType, "button")   == 0) { return BUTTON; }
+  if (strcmp(inputType, "contact")  == 0) { return CONTACT; }
+  if (strcmp(inputType, "press")    == 0) { return PRESS; }
+  if (strcmp(inputType, "rotary")   == 0) { return ROTARY; }
+  if (strcmp(inputType, "security") == 0) { return SECURITY; }
+  if (strcmp(inputType, "switch")   == 0) { return SWITCH; }
+  if (strcmp(inputType, "toggle")   == 0) { return TOGGLE; }
 
   Serial.println(F("[smon] invalid input type"));
   return INVALID_INPUT_TYPE;
@@ -291,7 +293,7 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   uint8_t port = ((index - 1) / 4) + 1;
   uint8_t channel = index - ((port - 1) * 4);
   
-  char inputType[8];
+  char inputType[9];
   getInputType(inputType, type);
   char eventType[7];
   getEventType(eventType, type, state);
@@ -330,6 +332,9 @@ void getInputType(char inputType[], uint8_t type)
       break;
     case ROTARY:
       sprintf_P(inputType, PSTR("rotary"));
+      break;
+    case SECURITY:
+      sprintf_P(inputType, PSTR("security"));
       break;
     case SWITCH:
       sprintf_P(inputType, PSTR("switch"));
@@ -391,6 +396,23 @@ void getEventType(char eventType[], uint8_t type, uint8_t state)
           break;
         case HIGH_EVENT:
           sprintf_P(eventType, PSTR("down"));
+          break;
+      }
+      break;
+    case SECURITY:
+      switch (state)
+      {
+        case HIGH_EVENT:
+          sprintf_P(eventType, PSTR("normal"));
+          break;
+        case LOW_EVENT:
+          sprintf_P(eventType, PSTR("alarm"));
+          break;
+        case TAMPER_EVENT:
+          sprintf_P(eventType, PSTR("tamper"));
+          break;
+        case SHORT_EVENT:
+          sprintf_P(eventType, PSTR("short"));
           break;
       }
       break;
