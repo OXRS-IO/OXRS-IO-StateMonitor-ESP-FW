@@ -403,7 +403,7 @@ void getEventType(char eventType[], uint8_t type, uint8_t state)
       switch (state)
       {
         case HIGH_EVENT:
-          sprintf_P(eventType, PSTR("alarm"));
+          sprintf_P(eventType, PSTR("normal"));
           break;
         case LOW_EVENT:
           sprintf_P(eventType, PSTR("alarm"));
