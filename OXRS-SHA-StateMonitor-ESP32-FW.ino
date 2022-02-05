@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.9.1"
+#define FW_VERSION    "4.0.a1"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -58,6 +58,10 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 /*--------------------------- Global Variables ---------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
+
+// flags ports when the config has changed from/to SECURITY 
+// (bitwise coded per port, 1 = SECURITY, 0 = other)
+uint32_t g_port_new_config = 0;
 
 /*--------------------------- Instantiate Global Objects -----------------*/
 // Rack32 handler
@@ -119,7 +123,7 @@ void loop()
     uint16_t io_value = mcp23017[mcp].readGPIOAB();
 
     // Show port animations
-    rack32.updateDisplayPorts(mcp, io_value);
+    rack32.updateDisplayPorts(mcp, io_value, g_port_new_config);
 
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
@@ -202,7 +206,7 @@ void jsonInputConfig(JsonVariant json)
 
     if (inputType != INVALID_INPUT_TYPE)
     {
-      oxrsInput[mcp].setType(pin, inputType);
+      config_input_type(mcp, pin, inputType);
     }
   }
   
@@ -249,7 +253,7 @@ void setDefaultInputType(uint8_t inputType)
 
     for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
     {
-      oxrsInput[mcp].setType(pin, inputType);
+      config_input_type(mcp, pin, inputType);
     }
   }
 }
@@ -447,6 +451,25 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 
   // Publish the event
   publishEvent(index, type, state);
+}
+
+/**
+  wrapper for oxrsInput::setType() to register config changes to/from SECURITY
+*/
+void config_input_type(uint8_t mcp, uint8_t pin, uint8_t newType)
+{
+  uint8_t currentType = oxrsInput[mcp].getType(pin);
+  // use the first input per port only for evaluation (index = 1,5,9,...)
+  if ((newType != currentType) && ((pin % 4) == 0))
+  {
+    // set changed flag if old or new is SECURITY
+    if (newType == SECURITY || currentType == SECURITY)
+    {
+      int port = (mcp * 16 + pin) / 4;
+      bitWrite(g_port_new_config, port, (newType == SECURITY) ? 1 : 0);
+    }
+  }
+  oxrsInput[mcp].setType(pin, newType);
 }
 
 /**
