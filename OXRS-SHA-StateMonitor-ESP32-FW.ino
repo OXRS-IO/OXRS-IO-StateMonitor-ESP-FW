@@ -94,7 +94,7 @@ void setup()
   rack32.begin(jsonConfig, NULL);
 
   // Set up port display
-  rack32.setDisplayPorts(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
+  rack32.setDisplayPortLayout(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
 
   // Set up config schema (for self-discovery and adoption)
   setConfigSchema();
@@ -108,8 +108,10 @@ void setup()
 */
 void loop()
 {
+  // Let Rack32 hardware handle any events etc
+  rack32.loop();
+
   // Iterate through each of the MCP23017s
-  uint32_t port_changed = 0L;
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
     if (bitRead(g_mcps_found, mcp) == 0)
@@ -124,9 +126,6 @@ void loop()
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
   }
-
-  // Let Rack32 hardware handle any events etc
-  rack32.loop();
 }
 
 /**
@@ -256,17 +255,14 @@ void setDefaultInputType(uint8_t inputType)
 
 void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 {
-  // Update the port config on the attached screen
-  int port = (mcp * 16 + pin) / 4;
-
   // TODO: port config should be a constant in LCD lib
   switch (inputType)
   {
     case SECURITY:
-      rack32.setDisplayPortConfig(port, 1);
+      rack32.setDisplayPortConfig(mcp, pin, 1);
       break;
     default:
-      rack32.setDisplayPortConfig(port, 0);
+      rack32.setDisplayPortConfig(mcp, pin, 0);
       break;
   }
 
