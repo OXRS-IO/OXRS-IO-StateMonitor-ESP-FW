@@ -255,14 +255,14 @@ void setDefaultInputType(uint8_t inputType)
 
 void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 {
-  // TODO: port config should be a constant in LCD lib
+  // Port config constant comes from the LCD library
   switch (inputType)
   {
     case SECURITY:
-      rack32.setDisplayPortConfig(mcp, pin, 1);
+      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_SECURITY);
       break;
     default:
-      rack32.setDisplayPortConfig(mcp, pin, 0);
+      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_DEFAULT);
       break;
   }
 
