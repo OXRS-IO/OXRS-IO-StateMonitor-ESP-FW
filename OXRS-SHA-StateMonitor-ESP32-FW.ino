@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.9.1"
+#define FW_VERSION    "3.10.0"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -94,7 +94,7 @@ void setup()
   rack32.begin(jsonConfig, NULL);
 
   // Set up port display
-  rack32.setDisplayPorts(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
+  rack32.setDisplayPortLayout(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
 
   // Set up config schema (for self-discovery and adoption)
   setConfigSchema();
@@ -108,8 +108,10 @@ void setup()
 */
 void loop()
 {
+  // Let Rack32 hardware handle any events etc
+  rack32.loop();
+
   // Iterate through each of the MCP23017s
-  uint32_t port_changed = 0L;
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
     if (bitRead(g_mcps_found, mcp) == 0)
@@ -124,9 +126,6 @@ void loop()
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
   }
-
-  // Let Rack32 hardware handle any events etc
-  rack32.loop();
 }
 
 /**
@@ -202,7 +201,7 @@ void jsonInputConfig(JsonVariant json)
 
     if (inputType != INVALID_INPUT_TYPE)
     {
-      oxrsInput[mcp].setType(pin, inputType);
+      setInputType(mcp, pin, inputType);
     }
   }
   
@@ -249,9 +248,26 @@ void setDefaultInputType(uint8_t inputType)
 
     for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
     {
-      oxrsInput[mcp].setType(pin, inputType);
+      setInputType(mcp, pin, inputType);
     }
   }
+}
+
+void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
+{
+  // Port config constant comes from the LCD library
+  switch (inputType)
+  {
+    case SECURITY:
+      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_SECURITY);
+      break;
+    default:
+      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_DEFAULT);
+      break;
+  }
+
+  // Pass this update to the input handler
+  oxrsInput[mcp].setType(pin, inputType);
 }
 
 uint8_t getMaxIndex()
