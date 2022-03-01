@@ -137,9 +137,13 @@ void setConfigSchema()
   StaticJsonDocument<1024> json;
 
   JsonObject defaultInputType = json.createNestedObject("defaultInputType");
+  defaultInputType["title"] = "Default Input Type";
+  defaultInputType["description"] = "Set the default input type for anything without explicit configuration below. Defaults to ‘switch’.";
   createInputTypeEnum(defaultInputType);
 
   JsonObject inputs = json.createNestedObject("inputs");
+  inputs["title"] = "Input Configuration";
+  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are generated. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs).";
   inputs["type"] = "array";
   
   JsonObject items = inputs.createNestedObject("items");
@@ -148,14 +152,17 @@ void setConfigSchema()
   JsonObject properties = items.createNestedObject("properties");
 
   JsonObject index = properties.createNestedObject("index");
+  index["title"] = "Index";
   index["type"] = "integer";
   index["minimum"] = 1;
   index["maximum"] = getMaxIndex();
 
   JsonObject type = properties.createNestedObject("type");
+  type["title"] = "Type";
   createInputTypeEnum(type);
 
   JsonObject invert = properties.createNestedObject("invert");
+  invert["title"] = "Invert";
   invert["type"] = "boolean";
 
   JsonArray required = items.createNestedArray("required");
