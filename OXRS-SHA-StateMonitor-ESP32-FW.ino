@@ -262,17 +262,14 @@ void setDefaultInputType(uint8_t inputType)
 
 void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 {
-  // Calculate the port index (zero-based)
-  uint8_t port = (mcp * 4) + (pin / 4);
-
   // Configure the display (type constant from LCD library)
   switch (inputType)
   {
     case SECURITY:
-      rack32.setDisplayPortType(port, PORT_TYPE_SECURITY);
+      rack32.setDisplayPinType(mcp, pin, PIN_TYPE_SECURITY);
       break;
     default:
-      rack32.setDisplayPortType(port, PORT_TYPE_DEFAULT);
+      rack32.setDisplayPinType(mcp, pin, PIN_TYPE_DEFAULT);
       break;
   }
 
@@ -282,11 +279,8 @@ void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 
 void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
 {
-  // Calculate the port index (zero-based)
-  uint8_t port = (mcp * 4) + (pin / 4);
-
   // Configure the display
-  rack32.setDisplayPortInvert(port, invert);
+  rack32.setDisplayPinInvert(mcp, pin, invert);
 
   // Pass this update to the input handler
   oxrsInput[mcp].setInvert(pin, invert);
