@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.10.0"
+#define FW_VERSION    "3.11.0"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -214,7 +214,7 @@ void jsonInputConfig(JsonVariant json)
   
   if (json.containsKey("invert"))
   {
-    oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
+    setInputInvert(mcp, pin, json["invert"].as<bool>());
   }
 }
 
@@ -262,19 +262,34 @@ void setDefaultInputType(uint8_t inputType)
 
 void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 {
-  // Port config constant comes from the LCD library
+  // Calculate the port index (zero-based)
+  uint8_t port = (mcp * 4) + (pin / 4);
+
+  // Configure the display (type constant from LCD library)
   switch (inputType)
   {
     case SECURITY:
-      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_SECURITY);
+      rack32.setDisplayPortType(port, PORT_TYPE_SECURITY);
       break;
     default:
-      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_DEFAULT);
+      rack32.setDisplayPortType(port, PORT_TYPE_DEFAULT);
       break;
   }
 
   // Pass this update to the input handler
   oxrsInput[mcp].setType(pin, inputType);
+}
+
+void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
+{
+  // Calculate the port index (zero-based)
+  uint8_t port = (mcp * 4) + (pin / 4);
+
+  // Configure the display
+  rack32.setDisplayPortInvert(port, invert);
+
+  // Pass this update to the input handler
+  oxrsInput[mcp].setInvert(pin, invert);
 }
 
 uint8_t getMaxIndex()
