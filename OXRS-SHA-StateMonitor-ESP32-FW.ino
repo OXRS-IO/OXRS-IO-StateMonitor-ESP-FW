@@ -214,7 +214,7 @@ void jsonInputConfig(JsonVariant json)
   
   if (json.containsKey("invert"))
   {
-    oxrsInput[mcp].setInvert(pin, json["invert"].as<bool>());
+    setInputInvert(mcp, pin, json["invert"].as<bool>());
   }
 }
 
@@ -262,19 +262,28 @@ void setDefaultInputType(uint8_t inputType)
 
 void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 {
-  // Port config constant comes from the LCD library
+  // Configure the display (type constant from LCD library)
   switch (inputType)
   {
     case SECURITY:
-      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_SECURITY);
+      rack32.setDisplayPinType(mcp, pin, PIN_TYPE_SECURITY);
       break;
     default:
-      rack32.setDisplayPortConfig(mcp, pin, PORT_CONFIG_DEFAULT);
+      rack32.setDisplayPinType(mcp, pin, PIN_TYPE_DEFAULT);
       break;
   }
 
   // Pass this update to the input handler
   oxrsInput[mcp].setType(pin, inputType);
+}
+
+void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
+{
+  // Configure the display
+  rack32.setDisplayPinInvert(mcp, pin, invert);
+
+  // Pass this update to the input handler
+  oxrsInput[mcp].setInvert(pin, invert);
 }
 
 uint8_t getMaxIndex()
