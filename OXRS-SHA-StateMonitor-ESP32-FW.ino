@@ -7,9 +7,9 @@
     ESP32
 
   External dependencies. Install using the Arduino library manager:
-    "Adafruit_MCP23017"
-    "OXRS-SHA-Rack32-ESP32-LIB" by SuperHouse Automation Pty
-    "OXRS-SHA-IOHandler-ESP32-LIB" by SuperHouse Automation Pty
+    [Adafruit_MCP23X17](https://github.com/adafruit/Adafruit-MCP23017-Arduino-Library)
+    [OXRS-SHA-Rack32-ESP32-LIB](https://github.com/SuperHouse/OXRS-SHA-Rack32-ESP32-LIB)
+    [OXRS-SHA-IOHandler-ESP32-LIB](https://github.com/SuperHouse/OXRS-SHA-IOHandler-ESP32-LIB)
 
   Compatible with the Light Switch Controller hardware found here:
     www.superhouse.tv/lightswitch
@@ -27,7 +27,7 @@
 #define FW_NAME       "OXRS-SHA-StateMonitor-ESP32-FW"
 #define FW_SHORT_NAME "State Monitor"
 #define FW_MAKER      "SuperHouse Automation"
-#define FW_VERSION    "3.10.0"
+#define FW_VERSION    "3.11.0"
 
 /*--------------------------- Libraries ----------------------------------*/
 #include <Adafruit_MCP23X17.h>        // For MCP23017 I/O buffers
@@ -75,9 +75,11 @@ OXRS_Input oxrsInput[MCP_COUNT];
 */
 void setup()
 {
-  // Startup logging to serial
+  // Start serial and let settle
   Serial.begin(SERIAL_BAUD_RATE);
-  Serial.println();
+  delay(1000);
+
+  // Dump firmware details to serial
   Serial.println(F("========================================"));
   Serial.print  (F("FIRMWARE: ")); Serial.println(FW_NAME);
   Serial.print  (F("MAKER:    ")); Serial.println(FW_MAKER);
@@ -241,7 +243,7 @@ uint8_t parseInputType(const char * inputType)
   if (strcmp(inputType, "switch")   == 0) { return SWITCH; }
   if (strcmp(inputType, "toggle")   == 0) { return TOGGLE; }
 
-  Serial.println(F("[smon] invalid input type"));
+  rack32.println(F("[smon] invalid input type"));
   return INVALID_INPUT_TYPE;
 }
 
@@ -303,7 +305,7 @@ uint8_t getIndex(JsonVariant json)
 {
   if (!json.containsKey("index"))
   {
-    Serial.println(F("[smon] missing index"));
+    rack32.println(F("[smon] missing index"));
     return 0;
   }
   
@@ -312,7 +314,7 @@ uint8_t getIndex(JsonVariant json)
   // Check the index is valid for this device
   if (index <= 0 || index > getMaxIndex())
   {
-    Serial.println(F("[smon] invalid index"));
+    rack32.println(F("[smon] invalid index"));
     return 0;
   }
 
@@ -339,9 +341,9 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
 
   if (!rack32.publishStatus(json.as<JsonVariant>()))
   {
-    Serial.print(F("[smon] [failover] "));
-    serializeJson(json, Serial);
-    Serial.println();
+    rack32.print(F("[smon] [failover] "));
+    serializeJson(json, rack32);
+    rack32.println();
 
     // TODO: add failover handling code here
   }
@@ -486,13 +488,13 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 */
 void scanI2CBus()
 {
-  Serial.println(F("[smon] scanning for I/O buffers..."));
+  rack32.println(F("[smon] scanning for I/O buffers..."));
 
   for (uint8_t mcp = 0; mcp < MCP_COUNT; mcp++)
   {
-    Serial.print(F(" - 0x"));
-    Serial.print(MCP_I2C_ADDRESS[mcp], HEX);
-    Serial.print(F("..."));
+    rack32.print(F(" - 0x"));
+    rack32.print(MCP_I2C_ADDRESS[mcp], HEX);
+    rack32.print(F("..."));
 
     // Check if there is anything responding on this address
     Wire.beginTransmission(MCP_I2C_ADDRESS[mcp]);
@@ -510,13 +512,13 @@ void scanI2CBus()
       // Initialise input handlers (default to SWITCH)
       oxrsInput[mcp].begin(inputEvent, SWITCH);
 
-      Serial.print(F("MCP23017"));
-      if (MCP_INTERNAL_PULLUPS) { Serial.print(F(" (internal pullups)")); }
-      Serial.println();
+      rack32.print(F("MCP23017"));
+      if (MCP_INTERNAL_PULLUPS) { rack32.print(F(" (internal pullups)")); }
+      rack32.println();
     }
     else
     {
-      Serial.println(F("empty"));
+      rack32.println(F("empty"));
     }
   }
 }
