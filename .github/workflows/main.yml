@@ -36,11 +36,11 @@ jobs:
         pip install --upgrade platformio
     
     - name: Build release binary
-      run: pio run -e release
+      run: pio run -e rack32-eth -e rack32-wifi
 
     - name: Create release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ".pio/build/release/*.bin"
+        artifacts: .pio/build/**/*_v${{ github.ref_name }}.bin
         token: ${{ secrets.GITHUB_TOKEN }}
         generateReleaseNotes: true

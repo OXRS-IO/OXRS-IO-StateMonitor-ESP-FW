@@ -7,8 +7,8 @@ config = env.GetProjectConfig()
 # get the firmware name from the [firmware] section in platformio.ini
 firmware_name = config.get("firmware", "name")
 
-# get the board type for this build
-board = env.GetProjectOption("board")
+# get the env name for this build
+env_name = env.subst("$PIOENV")
 
 # query the current version via git tags (unannotated)
 ret = subprocess.run(["git", "describe", "--tags"], stdout=subprocess.PIPE, text=True)
@@ -22,5 +22,5 @@ env.Append(
 )
 
 env.Replace(
-    PROGNAME="%s_%s_v%s" % (firmware_name, board, firmware_version)
+    PROGNAME="%s_%s_v%s" % (firmware_name, env_name, firmware_version)
 )
