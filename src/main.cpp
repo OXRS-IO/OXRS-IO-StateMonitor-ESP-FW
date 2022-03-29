@@ -8,7 +8,7 @@
     https://www.superhouse.tv/product/i2c-rj45-light-switch-breakout/
 
   GitHub repository:
-    https://github.com/SuperHouse/OXRS-SHA-StateMonitor-ESP-FW
+    https://github.com/SuperHouse/OXRS-SHA-StateMonitor-ESP32-FW
 
   Copyright 2019-2021 SuperHouse Automation Pty Ltd
 */
