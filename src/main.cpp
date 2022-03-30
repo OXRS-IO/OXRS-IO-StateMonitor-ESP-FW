@@ -19,6 +19,7 @@
 #include <OXRS_Rack32.h>              // Rack32 support
 #include <OXRS_Input.h>               // For input handling
 #include "logo.h"                     // Embedded maker logo
+#include <KnxTpUart.h>                // For KNX failover BCU
 
 /*--------------------------- Constants -------------------------------*/
 // Serial
@@ -40,9 +41,30 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 // Internal constant used when input type parsing fails
 #define       INVALID_INPUT_TYPE    99
 
+// KNX failover BCU on Serial2
+#define       KNX_PHYS_ADDRESS      "15.15.244"
+#define       KNX_SERIAL_BAUD       19200
+#define       KNX_SERIAL_CONFIG     SERIAL_8E1
+#define       KNX_SERIAL_RX         16
+#define       KNX_SERIAL_TX         17
+
+/*-------------------------- Internal datatypes --------------------------*/
+// Used to store KNX config/state
+struct KNXConfig
+{
+  char    address[12];
+  boolean state;
+};
+
 /*--------------------------- Global Variables ------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
+
+// Force failover flag
+bool g_forceFailover = false;
+
+// KNX config for each possible input
+KNXConfig g_knx_config[MCP_COUNT * MCP_PIN_COUNT];
 
 /*--------------------------- Instantiate Globals ---------------------*/
 // Rack32 handler
@@ -53,6 +75,9 @@ Adafruit_MCP23X17 mcp23017[MCP_COUNT];
 
 // Input handlers
 OXRS_Input oxrsInput[MCP_COUNT];
+
+// KNX failover BCU on Serial2
+KnxTpUart knx(&Serial2, KNX_PHYS_ADDRESS);
 
 /*--------------------------- Program ---------------------------------*/
 uint8_t getMaxIndex()
@@ -258,6 +283,74 @@ void setDefaultInputType(uint8_t inputType)
 }
 
 /**
+  Failover
+*/
+void initialiseFailoverSerial()
+{
+  rack32.println(F("[smon] [failover] setting up Serial2 for KNX BCU..."));
+  rack32.print(F(" - baud:   "));
+  rack32.println(KNX_SERIAL_BAUD);
+  rack32.print(F(" - config: "));
+  rack32.println(KNX_SERIAL_CONFIG);
+  rack32.print(F(" - rx pin: "));
+  rack32.println(KNX_SERIAL_RX);
+  rack32.print(F(" - tx pin: "));
+  rack32.println(KNX_SERIAL_TX);
+
+  Serial2.begin(KNX_SERIAL_BAUD, KNX_SERIAL_CONFIG, KNX_SERIAL_RX, KNX_SERIAL_TX);  
+}
+
+void handleFailoverEvent(uint8_t index, uint8_t type, uint8_t state)
+{
+  // Determine the KNX address to use for this index (if any)...
+  char * knxAddress = g_knx_config[index - 1].address;
+  
+  rack32.print(F("[smon] [failover] knx address "));
+  
+  if (strlen(knxAddress) == 0)
+  {
+    rack32.println(F("not found"));
+    return;
+  }
+
+  rack32.println(knxAddress);
+
+  // Determine what type of KNX telegram to send...
+  switch (type)
+  {
+    case BUTTON:
+      // Ignore HOLD events and treat all multi-press events as a TOGGLE
+      if (state != HOLD_EVENT)
+      {
+        // Toggle internal state and send boolean telegram with new state
+        g_knx_config[index - 1].state = !g_knx_config[index - 1].state;
+        knx.groupWriteBool(knxAddress, g_knx_config[index - 1].state);
+      }
+      break;
+    case CONTACT:
+      // Ignore CONTACT events
+      break;
+    case ROTARY:
+      // Send relative inc/dec dimming telegram (no internal state needed)
+      knx.groupWrite4BitDim(knxAddress, state == LOW_EVENT, 5);
+      break;
+    case SECURITY:
+      // Ignore SECURITY events
+      break;
+    case SWITCH:
+      // Send boolean telegram (no internal state needed)
+      knx.groupWriteBool(knxAddress, state == LOW_EVENT);
+      break;
+    case PRESS:
+    case TOGGLE:
+      // Toggle internal state and send boolean telegram with new state
+      g_knx_config[index - 1].state = !g_knx_config[index - 1].state;
+      knx.groupWriteBool(knxAddress, g_knx_config[index - 1].state);
+      break;  
+  }
+}
+
+/**
   Config handler
  */
 void setConfigSchema()
@@ -272,7 +365,7 @@ void setConfigSchema()
 
   JsonObject inputs = json.createNestedObject("inputs");
   inputs["title"] = "Input Configuration";
-  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are generated. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs).";
+  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are generated. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs). The KNX failover address must be in standard 3-level format, e.g. 1/2/3.";
   inputs["type"] = "array";
   
   JsonObject items = inputs.createNestedObject("items");
@@ -293,6 +386,11 @@ void setConfigSchema()
   JsonObject invert = properties.createNestedObject("invert");
   invert["title"] = "Invert";
   invert["type"] = "boolean";
+
+  JsonObject knxAddress = properties.createNestedObject("knxAddress");
+  knxAddress["title"] = "Failover KNX Group Address";
+  knxAddress["type"] = "string";
+  knxAddress["pattern"] = "^\\d+\\/\\d+\\/\\d+$";
 
   JsonArray required = items.createNestedArray("required");
   required.add("index");
@@ -344,6 +442,11 @@ void jsonInputConfig(JsonVariant json)
   {
     setInputInvert(mcp, pin, json["invert"].as<bool>());
   }
+
+  if (json.containsKey("knxAddress"))
+  {
+    strcpy(g_knx_config[index - 1].address, json["knxAddress"]);
+  }
 }
 
 void jsonConfig(JsonVariant json)
@@ -367,6 +470,31 @@ void jsonConfig(JsonVariant json)
   }
 }
 
+/**
+  Command handler
+ */
+void setCommandSchema()
+{
+  // Define our command schema
+  StaticJsonDocument<1024> json;
+
+  JsonObject forceFailover = json.createNestedObject("forceFailover");
+  forceFailover["title"] = "Force Failover";
+  forceFailover["description"] = "By-pass publishing input events to MQTT and fall through to failover handling, regardless of IP/MQTT connection state.";
+  forceFailover["type"] = "boolean";
+
+  // Pass our command schema down to the Rack32 library
+  rack32.setCommandSchema(json.as<JsonVariant>());
+}
+
+void jsonCommand(JsonVariant json)
+{
+  if (json.containsKey("forceFailover"))
+  {
+    g_forceFailover = json["forceFailover"].as<bool>();
+  }
+}
+
 void publishEvent(uint8_t index, uint8_t type, uint8_t state)
 {
   // Calculate the port and channel for this index (all 1-based)
@@ -385,13 +513,15 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   json["type"] = inputType;
   json["event"] = eventType;
 
-  if (!rack32.publishStatus(json.as<JsonVariant>()))
+  // If failover has been forced, or we fail to publish this event, fall
+  // through to the failover handling code
+  if (g_forceFailover || !rack32.publishStatus(json.as<JsonVariant>()))
   {
     rack32.print(F("[smon] [failover] "));
     serializeJson(json, rack32);
     rack32.println();
 
-    // TODO: add failover handling code here
+    handleFailoverEvent(index, type, state);
   }
 }
 
@@ -465,16 +595,20 @@ void setup()
   scanI2CBus();
 
   // Start Rack32 hardware
-  rack32.begin(jsonConfig, NULL);
+  rack32.begin(jsonConfig, jsonCommand);
 
   // Set up port display
   rack32.setDisplayPortLayout(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
 
-  // Set up config schema (for self-discovery and adoption)
+  // Set up config/command schemas (for self-discovery and adoption)
   setConfigSchema();
+  setCommandSchema();
   
   // Speed up I2C clock for faster scan rate (after bus scan)
   Wire.setClock(I2C_CLOCK_SPEED);
+
+  // Set up the failover serial port
+  initialiseFailoverSerial();
 }
 
 /**
