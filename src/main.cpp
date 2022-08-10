@@ -242,6 +242,15 @@ void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
   oxrsInput[mcp].setInvert(pin, invert);
 }
 
+void setInputDisabled(uint8_t mcp, uint8_t pin, int disabled)
+{
+  // Configure the display
+  rack32.setDisplayPinDisabled(mcp, pin, disabled);
+
+  // Pass this update to the input handler
+  oxrsInput[mcp].setDisabled(pin, disabled);
+}
+
 void setDefaultInputType(uint8_t inputType)
 {
   // Set all pins on all MCPs to this default input type
@@ -294,6 +303,10 @@ void setConfigSchema()
   invert["title"] = "Invert";
   invert["type"] = "boolean";
 
+  JsonObject disabled = properties.createNestedObject("disabled");
+  disabled["title"] = "Disabled";
+  disabled["type"] = "boolean";
+
   JsonArray required = items.createNestedArray("required");
   required.add("index");
 
@@ -343,6 +356,11 @@ void jsonInputConfig(JsonVariant json)
   if (json.containsKey("invert"))
   {
     setInputInvert(mcp, pin, json["invert"].as<bool>());
+  }
+
+  if (json.containsKey("disabled"))
+  {
+    setInputDisabled(mcp, pin, json["disabled"].as<bool>());
   }
 }
 
