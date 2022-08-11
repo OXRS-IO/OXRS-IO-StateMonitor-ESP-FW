@@ -281,7 +281,7 @@ void setConfigSchema()
 
   JsonObject inputs = json.createNestedObject("inputs");
   inputs["title"] = "Input Configuration";
-  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are generated. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs).";
+  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are emitted. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs). Disabling an input stops any events being emitted.";
   inputs["type"] = "array";
   
   JsonObject items = inputs.createNestedObject("items");
