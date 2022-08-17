@@ -242,6 +242,15 @@ void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
   oxrsInput[mcp].setInvert(pin, invert);
 }
 
+void setInputDisabled(uint8_t mcp, uint8_t pin, int disabled)
+{
+  // Configure the display
+  rack32.setDisplayPinDisabled(mcp, pin, disabled);
+
+  // Pass this update to the input handler
+  oxrsInput[mcp].setDisabled(pin, disabled);
+}
+
 void setDefaultInputType(uint8_t inputType)
 {
   // Set all pins on all MCPs to this default input type
@@ -272,7 +281,7 @@ void setConfigSchema()
 
   JsonObject inputs = json.createNestedObject("inputs");
   inputs["title"] = "Input Configuration";
-  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are generated. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs).";
+  inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are emitted. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs). Disabling an input stops any events being emitted.";
   inputs["type"] = "array";
   
   JsonObject items = inputs.createNestedObject("items");
@@ -293,6 +302,10 @@ void setConfigSchema()
   JsonObject invert = properties.createNestedObject("invert");
   invert["title"] = "Invert";
   invert["type"] = "boolean";
+
+  JsonObject disabled = properties.createNestedObject("disabled");
+  disabled["title"] = "Disabled";
+  disabled["type"] = "boolean";
 
   JsonArray required = items.createNestedArray("required");
   required.add("index");
@@ -343,6 +356,11 @@ void jsonInputConfig(JsonVariant json)
   if (json.containsKey("invert"))
   {
     setInputInvert(mcp, pin, json["invert"].as<bool>());
+  }
+
+  if (json.containsKey("disabled"))
+  {
+    setInputDisabled(mcp, pin, json["disabled"].as<bool>());
   }
 }
 
