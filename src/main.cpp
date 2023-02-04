@@ -31,9 +31,15 @@ OXRS_Room8266 oxrs;
 // Serial
 #define       SERIAL_BAUD_RATE      115200
 
+#if defined(USE_GPIO)
+const uint8_t GPIOS[]             = {2, 4, 5, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27};
+const uint8_t GPIO_COUNT          = sizeof(GPIOS);
+const uint8_t MCP_COUNT           = 1;
+#else
 // Can have up to 8x MCP23017s on a single I2C bus
 const byte    MCP_I2C_ADDRESS[]     = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27 };
 const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
+#endif
 
 // Each MCP23017 has 16 I/O pins
 #define       MCP_PIN_COUNT         16
@@ -53,12 +59,37 @@ uint8_t g_mcps_found = 0;
 
 /*--------------------------- Instantiate Globals ---------------------*/
 // I/O buffers
+#if not defined (USE_GPIO)
 Adafruit_MCP23X17 mcp23017[MCP_COUNT];
-
+#endif
 // Input handlers
 OXRS_Input oxrsInput[MCP_COUNT];
 
 /*--------------------------- Program ---------------------------------*/
+#if defined (USE_GPIO)
+// set GPIOS to input_pullup
+void configGpios(int mode)
+{
+  for (int i = 0; i < GPIO_COUNT; i++)
+  {
+    pinMode(GPIOS[i], mode);
+  }
+}
+
+// read all GPIOS at once and make 16-bit result (mimic MCP)
+uint16_t getGpioBits(void)
+{
+  uint32_t inReg = REG_READ(GPIO_IN_REG);
+  uint16_t result = 0xffff;
+  for (int i = 0; i < GPIO_COUNT; i++)
+  {
+    if (!bitRead(inReg, GPIOS[i]))
+      bitClear(result, i);
+  }
+  return result;
+}
+#endif
+
 uint8_t getMaxIndex()
 {
   // Count how many MCPs were found
@@ -84,6 +115,20 @@ void createInputTypeEnum(JsonObject parent)
   typeEnum.add("switch");
   typeEnum.add("toggle");
 }
+
+#if defined (USE_GPIO)
+void createInputGpioEnum(JsonObject parent)
+{
+  JsonArray typeEnum = parent.createNestedArray("enum");
+
+  for (int i = 0; i < GPIO_COUNT; i++)
+  {
+    char buffer [5];
+    sprintf(buffer,"%d", GPIOS[i]);
+    typeEnum.add(buffer);
+  }
+}
+#endif
 
 uint8_t parseInputType(const char * inputType)
 {
@@ -223,7 +268,7 @@ void getEventType(char eventType[], uint8_t type, uint8_t state)
 void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 {
   // Configure the display (type constant from LCD library)
-  #if defined(OXRS_RACK32)
+  #if defined(OXRS_RACK32) and not defined (USE_GPIO)
   switch (inputType)
   {
     case SECURITY:
@@ -242,7 +287,7 @@ void setInputType(uint8_t mcp, uint8_t pin, uint8_t inputType)
 void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
 {
   // Configure the display
-  #if defined(OXRS_RACK32)
+  #if defined(OXRS_RACK32) and not defined(USE_GPIO)
   oxrs.setDisplayPinInvert(mcp, pin, invert);
   #endif
 
@@ -253,7 +298,7 @@ void setInputInvert(uint8_t mcp, uint8_t pin, int invert)
 void setInputDisabled(uint8_t mcp, uint8_t pin, int disabled)
 {
   // Configure the display
-  #if defined(OXRS_RACK32)
+  #if defined(OXRS_RACK32) and not defined(USE_GPIO)
   oxrs.setDisplayPinDisabled(mcp, pin, disabled);
   #endif
 
@@ -298,12 +343,17 @@ void setConfigSchema()
   items["type"] = "object";
 
   JsonObject properties = items.createNestedObject("properties");
-
+#if not defined (USE_GPIO)
   JsonObject index = properties.createNestedObject("index");
   index["title"] = "Index";
   index["type"] = "integer";
   index["minimum"] = 1;
   index["maximum"] = getMaxIndex();
+#else
+  JsonObject index = properties.createNestedObject("index");
+  index["title"] = "Index";
+  createInputGpioEnum(index);
+#endif
 
   JsonObject type = properties.createNestedObject("type");
   type["title"] = "Type";
@@ -333,6 +383,18 @@ uint8_t getIndex(JsonVariant json)
   }
   
   uint8_t index = json["index"].as<uint8_t>();
+#if defined(USE_GPIO)
+  uint8_t indexTemp = 0xff;
+  for (int i = 0; i < GPIO_COUNT; i++)
+  {
+    if (index == GPIOS[i])
+    {
+      indexTemp = i + 1;
+      break;
+    }
+  }
+  index = indexTemp;
+#endif
 
   // Check the index is valid for this device
   if (index <= 0 || index > getMaxIndex())
@@ -409,7 +471,11 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   StaticJsonDocument<128> json;
   json["port"] = port;
   json["channel"] = channel;
+#if not defined (USE_GPIO)
   json["index"] = index;
+#else
+  json["index"] = GPIOS[index-1];
+#endif
   json["type"] = inputType;
   json["event"] = eventType;
 
@@ -439,6 +505,7 @@ void inputEvent(uint8_t id, uint8_t input, uint8_t type, uint8_t state)
 /**
   I2C
 */
+#if not defined (USE_GPIO)
 void scanI2CBus()
 {
   oxrs.println(F("[smon] scanning for I/O buffers..."));
@@ -475,6 +542,7 @@ void scanI2CBus()
     }
   }
 }
+#endif
 
 /**
   Setup
@@ -486,19 +554,35 @@ void setup()
   delay(1000);
   Serial.println(F("[smon] starting up..."));
 
+#if not defined (USE_GPIO)
   // Start the I2C bus
   Wire.begin(I2C_SDA, I2C_SCL);
 
   // Scan the I2C bus and set up I/O buffers
   scanI2CBus();
+#else
+  oxrs.println(F("[smon] using GPIOs for direct I/O..."));
+
+  // simulate 1 MCP found 
+  g_mcps_found = 0x1;
+
+  // Initialise input handlers (default to SWITCH)
+  oxrsInput[0].begin(inputEvent, SWITCH);
+#endif
 
   // Start hardware
   oxrs.begin(jsonConfig, NULL);
 
-  // Set up port display
-  #if defined(OXRS_RACK32)
+#if defined (USE_GPIO)
+  // configure usable GPIOs as INPUT_PULLUP
+  // must run after oxrs.begin to override GPIO pins used by screen SPI
+  configGpios(INPUT_PULLUP);
+#endif
+
+// Set up port display
+#if defined(OXRS_RACK32) and not defined(USE_GPIO)
   oxrs.setDisplayPortLayout(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
-  #endif
+#endif
 
   // Set up config schema (for self-discovery and adoption)
   setConfigSchema();
@@ -521,13 +605,20 @@ void loop()
     if (bitRead(g_mcps_found, mcp) == 0)
       continue;
 
+  #if not defined (USE_GPIO)
     // Read the values for all 16 pins on this MCP
     uint16_t io_value = mcp23017[mcp].readGPIOAB();
+  #else
+    // Read the GPIO values as word
+    uint16_t io_value = getGpioBits();
+    // required to give background functions a chance
+    delay(1);
+  #endif
 
-    // Show port animations
-    #if defined(OXRS_RACK32)
+// Show port animations
+  #if defined(OXRS_RACK32) and not defined(USE_GPIO)
     oxrs.updateDisplayPorts(mcp, io_value);
-    #endif
+  #endif
 
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
