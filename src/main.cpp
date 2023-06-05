@@ -1,5 +1,5 @@
 /**
-  ESP32 state monitor firmware for the Open eXtensible Rack System
+  ESP state monitor firmware for the Open eXtensible Rack System
 
   Documentation:  
     https://oxrs.io/docs/firmware/state-monitor-esp32.html
@@ -8,9 +8,7 @@
     https://www.superhouse.tv/product/i2c-rj45-light-switch-breakout/
 
   GitHub repository:
-    https://github.com/SuperHouse/OXRS-SHA-StateMonitor-ESP32-FW
-
-  Copyright 2019-2021 SuperHouse Automation Pty Ltd
+    https://github.com/OXRS-IO/OXRS-IO-StateMonitor-ESP-FW
 */
 
 /*--------------------------- Libraries -------------------------------*/
