@@ -519,7 +519,7 @@ void setup()
   scanI2CBus();
 
   // Start hardware
-  oxrs.begin(jsonConfig, NULL);
+  oxrs.begin(jsonConfig, jsonCommand);
 
   // Set up port display
   #if defined(OXRS_RACK32)
