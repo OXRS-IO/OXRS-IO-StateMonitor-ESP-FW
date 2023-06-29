@@ -49,6 +49,9 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
 
+// Query current value of all bi-stable inputs
+bool g_queryInputs = false;
+
 /*--------------------------- Instantiate Globals ---------------------*/
 // I/O buffers
 Adafruit_MCP23X17 mcp23017[MCP_COUNT];
@@ -393,6 +396,31 @@ void jsonConfig(JsonVariant json)
   }
 }
 
+/**
+  Command handler
+ */
+void setCommandSchema()
+{
+  // Define our command schema
+  StaticJsonDocument<1024> json;
+
+  JsonObject queryInputs = json.createNestedObject("queryInputs");
+  queryInputs["title"] = "Query Inputs";
+  queryInputs["description"] = "Query and publish the state of all bi-stable inputs.";
+  queryInputs["type"] = "boolean";
+
+  // Pass our command schema down to the hardware library
+  oxrs.setCommandSchema(json.as<JsonVariant>());
+}
+
+void jsonCommand(JsonVariant json)
+{
+  if (json.containsKey("queryInputs"))
+  {
+    g_queryInputs = json["queryInputs"].as<bool>();
+  }
+}
+
 void publishEvent(uint8_t index, uint8_t type, uint8_t state)
 {
   // Calculate the port and channel for this index (all 1-based)
@@ -498,8 +526,9 @@ void setup()
   oxrs.setDisplayPortLayout(g_mcps_found, PORT_LAYOUT_INPUT_AUTO);
   #endif
 
-  // Set up config schema (for self-discovery and adoption)
+  // Set up config/command schemas (for self-discovery and adoption)
   setConfigSchema();
+  setCommandSchema();
   
   // Speed up I2C clock for faster scan rate (after bus scan)
   Wire.setClock(I2C_CLOCK_SPEED);
@@ -529,5 +558,14 @@ void loop()
 
     // Check for any input events
     oxrsInput[mcp].process(mcp, io_value);
+
+    // Check if we are querying the current values
+    if (g_queryInputs)
+    {
+      oxrsInput[mcp].queryAll(mcp);
+    }
   }
+
+  // Ensure we don't keep querying
+  g_queryInputs = false;
 }
