@@ -52,6 +52,9 @@ uint8_t g_mcps_found = 0;
 // Query current value of all bi-stable inputs
 bool g_queryInputs = false;
 
+// Publish Home Assistant self-discovery config for each input
+bool g_hassDiscoveryPublished[MCP_COUNT * MCP_PIN_COUNT];
+
 /*--------------------------- Instantiate Globals ---------------------*/
 // I/O buffers
 Adafruit_MCP23X17 mcp23017[MCP_COUNT];
@@ -361,17 +364,20 @@ void jsonInputConfig(JsonVariant json)
     if (inputType != INVALID_INPUT_TYPE)
     {
       setInputType(mcp, pin, inputType);
+      g_hassDiscoveryPublished[index - 1] = false;
     }
   }
   
   if (json.containsKey("invert"))
   {
     setInputInvert(mcp, pin, json["invert"].as<bool>());
+    g_hassDiscoveryPublished[index - 1] = false;
   }
 
   if (json.containsKey("disabled"))
   {
     setInputDisabled(mcp, pin, json["disabled"].as<bool>());
+    g_hassDiscoveryPublished[index - 1] = false;
   }
 }
 
@@ -446,6 +452,75 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
     oxrs.println();
 
     // TODO: add failover handling code here
+  }
+}
+
+void publishHassDiscovery(uint8_t mcp)
+{
+  char component[16];
+  char valueTemplate[128];
+
+  char inputId[16];
+  char inputName[16];
+
+  // Read security sensor values in quads (a full port)
+  uint8_t securityCount = 0;
+
+  for (uint8_t pin = 0; pin < MCP_PIN_COUNT; pin++)
+  {
+    // Determine the input type
+    uint8_t inputType = oxrsInput[mcp].getType(pin);
+
+    // Only generate config for the last security input
+    if (inputType == SECURITY)
+    {
+      if (++securityCount < 4) 
+        continue;
+      
+      securityCount = 0;
+    }
+
+    // Calculate the 1-based input index
+    uint8_t input = (MCP_PIN_COUNT * mcp) + pin + 1;
+
+    // Ignore if we have already published the discovery config for this input
+    if (g_hassDiscoveryPublished[input - 1])
+      continue;
+
+    // Only interested in CONTACT, SECURITY, SWITCH inputs
+    switch (inputType)
+    {
+      case CONTACT:
+        sprintf_P(component, PSTR("binary_sensor"));
+        sprintf_P(valueTemplate, PSTR("{%% if value_json.index == %d %%}{%% if value_json.event == 'open' %%}ON{%% else %%}OFF{%% endif %%}{%% endif %%}"), input);
+        break;
+      case SECURITY:
+        sprintf_P(component, PSTR("binary_sensor"));
+        sprintf_P(valueTemplate, PSTR("{%% if value_json.index == %d %%}{%% if value_json.event == 'alarm' %%}ON{%% else %%}OFF{%% endif %%}{%% endif %%}"), input);
+        break;
+      case SWITCH:
+        sprintf_P(component, PSTR("binary_sensor"));
+        sprintf_P(valueTemplate, PSTR("{%% if value_json.index == %d %%}{%% if value_json.event == 'on' %%}ON{%% else %%}OFF{%% endif %%}{%% endif %%}"), input);
+        break;
+      default:
+        continue;
+    }
+
+    // JSON config payload (empty if the input is disabled, to clear any existing config)
+    DynamicJsonDocument json(1024);
+
+    sprintf_P(inputId, PSTR("input_%d"), input);
+    sprintf_P(inputName, PSTR("Input %d"), input);
+
+    // Check if this input is disabled
+    if (!oxrsInput[mcp].getDisabled(pin))
+    {
+      oxrs.getHassDiscoveryJson(json, inputId, inputName);
+      json["val_tpl"] = valueTemplate;
+    }
+
+    // Publish retained and stop trying once successful 
+    g_hassDiscoveryPublished[input - 1] = oxrs.publishHassDiscovery(json, component, inputId);
   }
 }
 
@@ -563,6 +638,12 @@ void loop()
     if (g_queryInputs)
     {
       oxrsInput[mcp].queryAll(mcp);
+    }
+
+    // Check if we need to publish any Home Assistant discovery payloads
+    if (oxrs.isHassDiscoveryEnabled())
+    {
+      publishHassDiscovery(mcp);
     }
   }
 
