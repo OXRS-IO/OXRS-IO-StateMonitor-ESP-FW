@@ -45,9 +45,6 @@ const uint8_t MCP_COUNT             = sizeof(MCP_I2C_ADDRESS);
 // Internal constant used when input type parsing fails
 #define       INVALID_INPUT_TYPE    99
 
-// Max number of supported inputs
-const uint8_t MAX_INPUT_COUNT       = MCP_COUNT * MCP_PIN_COUNT;
-
 /*--------------------------- Global Variables ------------------------*/
 // Each bit corresponds to an MCP found on the IC2 bus
 uint8_t g_mcps_found = 0;
@@ -56,7 +53,7 @@ uint8_t g_mcps_found = 0;
 bool g_queryInputs = false;
 
 // Publish Home Assistant self-discovery config for each input
-bool g_hassDiscoveryPublished[MAX_INPUT_COUNT];
+bool g_hassDiscoveryPublished[MCP_COUNT * MCP_PIN_COUNT];
 
 /*--------------------------- Instantiate Globals ---------------------*/
 // I/O buffers
