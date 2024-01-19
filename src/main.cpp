@@ -82,7 +82,7 @@ uint8_t getMaxIndex()
 
 void createInputTypeEnum(JsonObject parent)
 {
-  JsonArray typeEnum = parent.createNestedArray("enum");
+  JsonArray typeEnum = parent["enum"].to<JsonArray>();
   
   typeEnum.add("button");
   typeEnum.add("contact");
@@ -293,42 +293,42 @@ void setDefaultInputType(uint8_t inputType)
 void setConfigSchema()
 {
   // Define our config schema
-  StaticJsonDocument<1024> json;
+  JsonDocument json;
 
-  JsonObject defaultInputType = json.createNestedObject("defaultInputType");
+  JsonObject defaultInputType = json["defaultInputType"].to<JsonObject>();
   defaultInputType["title"] = "Default Input Type";
   defaultInputType["description"] = "Set the default input type for anything without explicit configuration below. Defaults to ‘switch’.";
   createInputTypeEnum(defaultInputType);
 
-  JsonObject inputs = json.createNestedObject("inputs");
+  JsonObject inputs = json["inputs"].to<JsonObject>();
   inputs["title"] = "Input Configuration";
   inputs["description"] = "Add configuration for each input in use on your device. The 1-based index specifies which input you wish to configure. The type defines how an input is monitored and what events are emitted. Inverting an input swaps the 'active' state (only useful for 'contact' and 'switch' inputs). Disabling an input stops any events being emitted.";
   inputs["type"] = "array";
   
-  JsonObject items = inputs.createNestedObject("items");
+  JsonObject items = inputs["items"].to<JsonObject>();
   items["type"] = "object";
 
-  JsonObject properties = items.createNestedObject("properties");
+  JsonObject properties = items["properties"].to<JsonObject>();
 
-  JsonObject index = properties.createNestedObject("index");
+  JsonObject index = properties["index"].to<JsonObject>();
   index["title"] = "Index";
   index["type"] = "integer";
   index["minimum"] = 1;
   index["maximum"] = getMaxIndex();
 
-  JsonObject type = properties.createNestedObject("type");
+  JsonObject type = properties["type"].to<JsonObject>();
   type["title"] = "Type";
   createInputTypeEnum(type);
 
-  JsonObject invert = properties.createNestedObject("invert");
+  JsonObject invert = properties["invert"].to<JsonObject>();
   invert["title"] = "Invert";
   invert["type"] = "boolean";
 
-  JsonObject disabled = properties.createNestedObject("disabled");
+  JsonObject disabled = properties["disabled"].to<JsonObject>();
   disabled["title"] = "Disabled";
   disabled["type"] = "boolean";
 
-  JsonArray required = items.createNestedArray("required");
+  JsonArray required = items["required"].to<JsonArray>();
   required.add("index");
 
   // Add any Home Assistant config
@@ -421,9 +421,9 @@ void jsonConfig(JsonVariant json)
 void setCommandSchema()
 {
   // Define our command schema
-  StaticJsonDocument<1024> json;
+  JsonDocument json;
 
-  JsonObject queryInputs = json.createNestedObject("queryInputs");
+  JsonObject queryInputs = json["queryInputs"].to<JsonObject>();
   queryInputs["title"] = "Query Inputs";
   queryInputs["description"] = "Query and publish the state of all bi-stable inputs.";
   queryInputs["type"] = "boolean";
@@ -451,7 +451,7 @@ void publishEvent(uint8_t index, uint8_t type, uint8_t state)
   char eventType[8];
   getEventType(eventType, type, state);
 
-  StaticJsonDocument<128> json;
+  JsonDocument json;
   json["port"] = port;
   json["channel"] = channel;
   json["index"] = index;
@@ -508,7 +508,7 @@ void publishHassDiscovery(uint8_t mcp)
       continue;
 
     // JSON config payload (empty if the input is disabled, to clear any existing config)
-    DynamicJsonDocument json(1024);
+    JsonDocument json;
 
     sprintf_P(inputId, PSTR("input_%d"), input);
 
